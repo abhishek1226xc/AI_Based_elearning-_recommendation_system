@@ -19,7 +19,6 @@ export default function AuthPage() {
     const utils = trpc.useUtils();
     const loginMutation = trpc.auth.login.useMutation();
     const registerMutation = trpc.auth.register.useMutation();
-
     const isLoading = loginMutation.isPending || registerMutation.isPending;
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -86,9 +85,9 @@ export default function AuthPage() {
                         </p>
                         <div className="grid grid-cols-2 gap-4 max-w-sm">
                             {[
-                                { n: "10+", l: "Platforms Tracked" },
-                                { n: "50K+", l: "Courses Indexed" },
-                                { n: "4.8★", l: "Avg Recommendation" },
+                                { n: "6", l: "Platforms Tracked" },
+                                { n: "20+", l: "Real Courses" },
+                                { n: "4 ML", l: "Algorithms Used" },
                                 { n: "100%", l: "Free to Use" },
                             ].map((s, i) => (
                                 <motion.div
@@ -115,7 +114,6 @@ export default function AuthPage() {
                     transition={{ duration: 0.5, delay: 0.2 }}
                     className="w-full max-w-md"
                 >
-                    {/* Mobile logo */}
                     <div className="lg:hidden flex items-center gap-2 mb-8 justify-center">
                         <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
                             <BookOpen className="w-6 h-6 text-white" />
@@ -129,7 +127,9 @@ export default function AuthPage() {
                                 {mode === "login" ? "Welcome Back" : "Create Account"}
                             </h2>
                             <p className="text-slate-500 mt-1">
-                                {mode === "login" ? "Sign in to your personalized recommendations" : "Start getting AI-powered course recommendations"}
+                                {mode === "login"
+                                    ? "Sign in to your personalized recommendations"
+                                    : "Start getting AI-powered course recommendations"}
                             </p>
                         </div>
 
@@ -186,7 +186,11 @@ export default function AuthPage() {
                                         required
                                         minLength={mode === "register" ? 6 : 1}
                                     />
-                                    <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-3 text-slate-400 hover:text-slate-600">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPw(!showPw)}
+                                        className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                                    >
                                         {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                     </button>
                                 </div>
@@ -199,9 +203,15 @@ export default function AuthPage() {
                                     className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-xl py-6 text-lg shadow-lg shadow-blue-500/25"
                                 >
                                     {isLoading ? (
-                                        <><Loader2 className="w-5 h-5 animate-spin mr-2" /> {mode === "login" ? "Signing in..." : "Creating account..."}</>
+                                        <>
+                                            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                                            {mode === "login" ? "Signing in..." : "Creating account..."}
+                                        </>
                                     ) : (
-                                        <>{mode === "login" ? "Sign In" : "Create Account"} <ArrowRight className="w-5 h-5 ml-2" /></>
+                                        <>
+                                            {mode === "login" ? "Sign In" : "Create Account"}
+                                            <ArrowRight className="w-5 h-5 ml-2" />
+                                        </>
                                     )}
                                 </Button>
                             </motion.div>

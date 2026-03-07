@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation, useRoute } from "wouter";
 import { ArrowLeft, BookOpen, Clock, Star, Users, Sparkles, Loader2, ExternalLink, Award, Bookmark, BookmarkCheck, Globe } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
@@ -28,19 +28,47 @@ export default function CourseDetail() {
 
   if (!courseId) { navigate("/courses"); return null; }
 
+  const utils = trpc.useUtils();
   const courseQuery = trpc.courses.getById.useQuery({ id: courseId });
   const platformRatingsQuery = trpc.courses.platformRatings.useQuery({ courseId });
   const relatedQuery = trpc.recommendations.relatedCourses.useQuery({ courseId, limit: 5 });
   const aiSuggestionsQuery = trpc.recommendations.aiSuggestions.useQuery({ courseId, limit: 6 }, { enabled: isAuthenticated });
-  const bookmarkMutation = trpc.bookmarks.add.useMutation();
+  const bookmarksQuery = trpc.bookmarks.list.useQuery(undefined, { enabled: isAuthenticated });
+  const bookmarkAddMutation = trpc.bookmarks.add.useMutation();
+  const bookmarkRemoveMutation = trpc.bookmarks.remove.useMutation();
+  const recordInteraction = trpc.enrollment.recordInteraction.useMutation();
+
+  // Check if already bookmarked
+  useEffect(() => {
+    if (bookmarksQuery.data) {
+      const isAlreadyBookmarked = bookmarksQuery.data.some((b: any) => b.courseId === courseId);
+      setBookmarked(isAlreadyBookmarked);
+    }
+  }, [bookmarksQuery.data, courseId]);
+
+  // Record view interaction
+  useEffect(() => {
+    if (isAuthenticated && courseId) {
+      recordInteraction.mutate({ courseId, interactionType: "viewed" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseId, isAuthenticated]);
 
   const handleBookmark = async () => {
     if (!isAuthenticated) { navigate("/auth"); return; }
     try {
-      await bookmarkMutation.mutateAsync({ courseId });
-      setBookmarked(true);
-      toast.success("Saved to your list! 🔖");
-    } catch { toast.error("Failed to save"); }
+      if (bookmarked) {
+        await bookmarkRemoveMutation.mutateAsync({ courseId });
+        setBookmarked(false);
+        toast.success("Removed from your list");
+      } else {
+        await bookmarkAddMutation.mutateAsync({ courseId });
+        setBookmarked(true);
+        toast.success("Saved to your list! 🔖");
+      }
+      // Invalidate so Dashboard updates
+      await utils.bookmarks.list.invalidate();
+    } catch { toast.error("Failed to update bookmark"); }
   };
 
   if (courseQuery.isLoading) {
@@ -125,7 +153,7 @@ export default function CourseDetail() {
                       <p className="text-xs text-slate-500 mb-1">{s.label}</p>
                       {s.badge ? (
                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold capitalize ${s.value === "beginner" ? "bg-emerald-100 text-emerald-700" :
-                            s.value === "intermediate" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                          s.value === "intermediate" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
                           }`}>{s.value}</span>
                       ) : s.star ? (
                         <div className="flex items-center justify-center gap-1">
@@ -275,8 +303,13 @@ export default function CourseDetail() {
                 </a>
 
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Button variant="outline" className="w-full rounded-xl" onClick={handleBookmark} disabled={bookmarked}>
-                    {bookmarked ? <><BookmarkCheck className="w-4 h-4 mr-2 text-emerald-600" /> Saved!</> : <><Bookmark className="w-4 h-4 mr-2" /> Save to My List</>}
+                  <Button
+                    variant="outline"
+                    className={`w-full rounded-xl ${bookmarked ? "border-emerald-300 bg-emerald-50 hover:bg-red-50 hover:border-red-300" : ""}`}
+                    onClick={handleBookmark}
+                    disabled={bookmarkAddMutation.isPending || bookmarkRemoveMutation.isPending}
+                  >
+                    {bookmarked ? <><BookmarkCheck className="w-4 h-4 mr-2 text-emerald-600" /> Saved — Click to Remove</> : <><Bookmark className="w-4 h-4 mr-2" /> Save to My List</>}
                   </Button>
                 </motion.div>
               </div>

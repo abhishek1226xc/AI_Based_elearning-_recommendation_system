@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
-import { BookOpen, Sparkles, TrendingUp, Clock, Star, ArrowRight, Loader2, Flame, Trophy, BarChart3, Target, Bookmark, ExternalLink, LogOut } from "lucide-react";
+import { BookOpen, Sparkles, TrendingUp, Clock, Star, ArrowRight, Loader2, Flame, Trophy, BarChart3, Target, Bookmark, ExternalLink, LogOut, Trash2, Zap, RefreshCw } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import { motion, type Variants, type Easing } from "framer-motion";
+import { toast } from "sonner";
 
 function AnimatedNumber({ value, suffix = "" }: { value: number | string; suffix?: string }) {
   const [display, setDisplay] = useState(0);
@@ -25,8 +26,8 @@ function AnimatedNumber({ value, suffix = "" }: { value: number | string; suffix
   return <span ref={ref}>{display}{suffix}</span>;
 }
 
-const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08 } } };
-const itemVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } } };
+const containerVariants: Variants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08 } } };
+const itemVariants: Variants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" as Easing } } };
 
 const PLATFORM_COLORS: Record<string, string> = {
   "Udemy": "bg-purple-100 text-purple-700", "Coursera": "bg-blue-100 text-blue-700",
@@ -39,15 +40,39 @@ export default function Dashboard() {
 
   if (!isAuthenticated) { navigate("/auth"); return null; }
 
+  const utils = trpc.useUtils();
   const bookmarksQuery = trpc.bookmarks.list.useQuery();
   const recommendationsQuery = trpc.recommendations.getForUser.useQuery({ limit: 8 });
   const interactionsQuery = trpc.enrollment.getInteractions.useQuery();
+  const generateMutation = trpc.recommendations.generate.useMutation();
+  const removeBookmarkMutation = trpc.bookmarks.remove.useMutation();
+
+  const handleGenerateRecommendations = async () => {
+    try {
+      await generateMutation.mutateAsync({ algorithm: "hybrid" });
+      await utils.recommendations.getForUser.invalidate();
+      toast.success("Recommendations generated! 🎯");
+    } catch {
+      toast.error("Failed to generate recommendations");
+    }
+  };
+
+  const handleRemoveBookmark = async (courseId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await removeBookmarkMutation.mutateAsync({ courseId });
+      await utils.bookmarks.list.invalidate();
+      toast.success("Removed from saved courses");
+    } catch {
+      toast.error("Failed to remove");
+    }
+  };
 
   const statCards = [
-    { icon: Bookmark, label: "Saved Courses", value: bookmarksQuery.data?.length || 0, color: "from-blue-500 to-cyan-500" },
-    { icon: BarChart3, label: "Courses Compared", value: interactionsQuery.data?.length || 0, color: "from-emerald-500 to-teal-500" },
-    { icon: Sparkles, label: "AI Suggestions", value: recommendationsQuery.data?.length || 0, color: "from-violet-500 to-purple-500" },
-    { icon: Trophy, label: "Platforms Tracked", value: "10", suffix: "+", color: "from-amber-500 to-yellow-500" },
+    { icon: Bookmark, label: "Saved Courses", value: bookmarksQuery.data?.length || 0, color: "from-blue-500 to-cyan-500", onClick: () => document.getElementById("saved-courses")?.scrollIntoView({ behavior: "smooth" }) },
+    { icon: BarChart3, label: "Courses Compared", value: interactionsQuery.data?.length || 0, color: "from-emerald-500 to-teal-500", onClick: () => navigate("/courses") },
+    { icon: Sparkles, label: "AI Suggestions", value: recommendationsQuery.data?.length || 0, color: "from-violet-500 to-purple-500", onClick: () => document.getElementById("ai-recs")?.scrollIntoView({ behavior: "smooth" }) },
+    { icon: Trophy, label: "Platforms Tracked", value: "6", suffix: "", color: "from-amber-500 to-yellow-500", onClick: () => navigate("/courses") },
   ];
 
   return (
@@ -97,7 +122,10 @@ export default function Dashboard() {
             const Icon = s.icon;
             return (
               <motion.div key={i} variants={itemVariants}>
-                <Card className="p-5 border-slate-200/80 bg-white/70 backdrop-blur-sm card-hover">
+                <Card
+                  className="p-5 border-slate-200/80 bg-white/70 backdrop-blur-sm card-hover cursor-pointer"
+                  onClick={s.onClick}
+                >
                   <div className="flex items-center gap-3 mb-3">
                     <div className={`w-11 h-11 bg-gradient-to-br ${s.color} rounded-xl flex items-center justify-center shadow-md`}>
                       <Icon className="w-5 h-5 text-white" />
@@ -116,11 +144,25 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-10">
             {/* AI Recommendations */}
-            <div>
+            <div id="ai-recs">
               <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
                   <Sparkles className="w-6 h-6 text-violet-500" /> AI-Recommended For You
                 </h2>
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button
+                    onClick={handleGenerateRecommendations}
+                    disabled={generateMutation.isPending}
+                    variant="outline"
+                    className="rounded-xl text-sm border-violet-200 text-violet-700 hover:bg-violet-50"
+                  >
+                    {generateMutation.isPending ? (
+                      <><Loader2 className="w-4 h-4 animate-spin mr-1" /> Generating...</>
+                    ) : (
+                      <><Zap className="w-4 h-4 mr-1" /> Generate New</>
+                    )}
+                  </Button>
+                </motion.div>
               </motion.div>
               {recommendationsQuery.isLoading ? (
                 <div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>
@@ -129,10 +171,20 @@ export default function Dashboard() {
                   {recommendationsQuery.data.map((rec: any, i: number) => (
                     <motion.div key={rec.courseId} variants={itemVariants}>
                       <Card className="p-5 border-slate-200/80 bg-white/70 card-hover group cursor-pointer" onClick={() => navigate(`/course/${rec.courseId}`)}>
-                        <div className="flex items-start justify-between mb-3">
-                          <h3 className="font-semibold text-slate-900 flex-1 group-hover:text-blue-600 transition-colors">{rec.reason}</h3>
-                          <span className="bg-gradient-to-r from-blue-100 to-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold ml-2">{Math.round(rec.score)}%</span>
+                        <div className="flex items-start justify-between mb-2">
+                          <h3 className="font-semibold text-slate-900 flex-1 group-hover:text-blue-600 transition-colors">
+                            {rec.course?.title || rec.reason}
+                          </h3>
+                          <span className="bg-gradient-to-r from-blue-100 to-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold ml-2">
+                            {Math.round(rec.score)}%
+                          </span>
                         </div>
+                        {rec.course?.platform && (
+                          <span className={`inline-block px-2 py-0.5 rounded-md text-xs font-bold mb-2 ${PLATFORM_COLORS[rec.course.platform] || "bg-slate-100 text-slate-700"}`}>
+                            {rec.course.platform}
+                          </span>
+                        )}
+                        <p className="text-xs text-slate-500 mb-3 line-clamp-2">{rec.reason}</p>
                         <div className="w-full bg-slate-100 rounded-full h-1.5 mb-4">
                           <motion.div initial={{ width: 0 }} whileInView={{ width: `${Math.min(rec.score, 100)}%` }} viewport={{ once: true }}
                             transition={{ delay: 0.3 + i * 0.1, duration: 0.8 }} className="bg-gradient-to-r from-blue-500 to-indigo-500 h-1.5 rounded-full" />
@@ -146,29 +198,54 @@ export default function Dashboard() {
                 </motion.div>
               ) : (
                 <Card className="p-10 text-center border-slate-200/80 bg-white/60">
-                  <BarChart3 className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-600 mb-4">Browse courses to get personalized recommendations</p>
-                  <Button onClick={() => navigate("/courses")} className="rounded-xl">Explore Courses</Button>
+                  <Zap className="w-12 h-12 text-violet-300 mx-auto mb-3" />
+                  <p className="text-slate-700 font-medium mb-2">No recommendations yet</p>
+                  <p className="text-slate-500 text-sm mb-5">Click "Generate New" above to get AI-powered course suggestions based on your interests.</p>
+                  <Button
+                    onClick={handleGenerateRecommendations}
+                    disabled={generateMutation.isPending}
+                    className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600"
+                  >
+                    {generateMutation.isPending ? (
+                      <><Loader2 className="w-4 h-4 animate-spin mr-1" /> Generating...</>
+                    ) : (
+                      <><Sparkles className="w-4 h-4 mr-1" /> Generate Recommendations</>
+                    )}
+                  </Button>
                 </Card>
               )}
             </div>
 
             {/* Saved Courses */}
-            <div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                <Bookmark className="w-6 h-6 text-blue-600" /> Saved Courses
-              </h2>
+            <div id="saved-courses">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                  <Bookmark className="w-6 h-6 text-blue-600" /> Saved Courses
+                </h2>
+                {bookmarksQuery.data && bookmarksQuery.data.length > 0 && (
+                  <span className="text-sm text-slate-500">{bookmarksQuery.data.length} course{bookmarksQuery.data.length > 1 ? "s" : ""} saved</span>
+                )}
+              </div>
               {bookmarksQuery.isLoading ? (
                 <div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>
               ) : bookmarksQuery.data && bookmarksQuery.data.length > 0 ? (
                 <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {bookmarksQuery.data.map((b: any) => (
                     <motion.div key={b.id} variants={itemVariants}>
-                      <Card className="p-5 border-slate-200/80 bg-white/70 card-hover group cursor-pointer" onClick={() => navigate(`/course/${b.courseId}`)}>
+                      <Card className="p-5 border-slate-200/80 bg-white/70 card-hover group cursor-pointer relative" onClick={() => navigate(`/course/${b.courseId}`)}>
                         <div className="flex items-start justify-between mb-2">
-                          <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors flex-1">{b.course?.title || `Course #${b.courseId}`}</h3>
-                          <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${PLATFORM_COLORS[b.course?.platform || ""] || "bg-slate-100 text-slate-700"}`}>{b.course?.platform}</span>
+                          <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors flex-1 pr-2">
+                            {b.course?.title || `Course #${b.courseId}`}
+                          </h3>
+                          <div className="flex items-center gap-1">
+                            <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${PLATFORM_COLORS[b.course?.platform || ""] || "bg-slate-100 text-slate-700"}`}>
+                              {b.course?.platform}
+                            </span>
+                          </div>
                         </div>
+                        {b.course?.description && (
+                          <p className="text-xs text-slate-500 mb-3 line-clamp-2">{b.course.description}</p>
+                        )}
                         {b.notes && <p className="text-sm text-slate-500 mb-3 italic">"{b.notes}"</p>}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -177,11 +254,22 @@ export default function Dashboard() {
                             <span>·</span>
                             <span className="text-emerald-600 font-semibold">{b.course?.platformPrice}</span>
                           </div>
-                          <a href={b.course?.platformUrl || "#"} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                            <Button size="sm" variant="outline" className="rounded-xl">
-                              Go <ExternalLink className="w-3 h-3 ml-1" />
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="rounded-xl text-red-500 hover:bg-red-50 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => handleRemoveBookmark(b.courseId, e)}
+                              disabled={removeBookmarkMutation.isPending}
+                            >
+                              <Trash2 className="w-3 h-3 mr-1" /> Remove
                             </Button>
-                          </a>
+                            <a href={b.course?.platformUrl || "#"} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                              <Button size="sm" variant="outline" className="rounded-xl">
+                                Go <ExternalLink className="w-3 h-3 ml-1" />
+                              </Button>
+                            </a>
+                          </div>
                         </div>
                       </Card>
                     </motion.div>
@@ -189,9 +277,12 @@ export default function Dashboard() {
                 </motion.div>
               ) : (
                 <Card className="p-10 text-center border-slate-200/80 bg-white/60">
-                  <Bookmark className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-600 mb-4">Save courses to compare them later</p>
-                  <Button onClick={() => navigate("/courses")} className="rounded-xl">Explore Courses</Button>
+                  <Bookmark className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-700 font-medium mb-2">No saved courses yet</p>
+                  <p className="text-slate-500 text-sm mb-5">Browse courses and click "Save to My List" to save them here for comparison.</p>
+                  <Button onClick={() => navigate("/courses")} className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600">
+                    Explore Courses
+                  </Button>
                 </Card>
               )}
             </div>
@@ -216,7 +307,7 @@ export default function Dashboard() {
               </h3>
               <ul className="space-y-3 text-sm text-slate-600">
                 {[
-                  "We index courses from 10+ platforms",
+                  "We index courses from 6 real platforms",
                   "AI compares ratings, reviews, and content",
                   "Get unbiased recommendations",
                   "Click through to learn on the platform",
@@ -234,6 +325,27 @@ export default function Dashboard() {
                 <p><span className="font-semibold">Name:</span> {user?.name}</p>
                 <p><span className="font-semibold">Email:</span> {user?.email}</p>
                 <p><span className="font-semibold">Member since:</span> {new Date(user?.createdAt || "").toLocaleDateString()}</p>
+              </div>
+            </Card>
+
+            {/* Quick Actions */}
+            <Card className="p-6 border-slate-200/80 bg-white/70 backdrop-blur-sm">
+              <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <Zap className="w-5 h-5 text-amber-500" /> Quick Actions
+              </h3>
+              <div className="space-y-2">
+                <Button variant="outline" className="w-full justify-start rounded-xl" onClick={() => navigate("/courses")}>
+                  <BookOpen className="w-4 h-4 mr-2" /> Browse All Courses
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start rounded-xl"
+                  onClick={handleGenerateRecommendations}
+                  disabled={generateMutation.isPending}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${generateMutation.isPending ? "animate-spin" : ""}`} />
+                  {generateMutation.isPending ? "Generating..." : "Refresh Recommendations"}
+                </Button>
               </div>
             </Card>
           </motion.div>

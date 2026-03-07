@@ -2,10 +2,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
-import { Search, Clock, Star, Users, ArrowLeft, BookOpen, X, ExternalLink, Globe } from "lucide-react";
+import { Search, Clock, Star, Users, ArrowLeft, BookOpen, X, ExternalLink, Globe, Bookmark, BookmarkCheck } from "lucide-react";
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 
 const PLATFORM_COLORS: Record<string, string> = {
   "Udemy": "bg-purple-100 text-purple-700 border-purple-200",
@@ -44,13 +46,38 @@ function SkeletonCard() {
 
 export default function Courses() {
   const [, navigate] = useLocation();
+  const { isAuthenticated } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"rating" | "reviews" | "learners">("rating");
 
+  const utils = trpc.useUtils();
   const coursesQuery = trpc.courses.list.useQuery({ limit: 100 });
   const categoriesQuery = trpc.courses.categories.useQuery();
+  const bookmarksQuery = trpc.bookmarks.list.useQuery(undefined, { enabled: isAuthenticated });
+  const addBookmark = trpc.bookmarks.add.useMutation();
+  const removeBookmark = trpc.bookmarks.remove.useMutation();
+
+  const bookmarkedIds = useMemo(() => {
+    if (!bookmarksQuery.data) return new Set<number>();
+    return new Set(bookmarksQuery.data.map((b: any) => b.courseId));
+  }, [bookmarksQuery.data]);
+
+  const handleToggleBookmark = async (courseId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isAuthenticated) { navigate("/auth"); return; }
+    try {
+      if (bookmarkedIds.has(courseId)) {
+        await removeBookmark.mutateAsync({ courseId });
+        toast.success("Removed from saved courses");
+      } else {
+        await addBookmark.mutateAsync({ courseId });
+        toast.success("Saved to your list! 🔖");
+      }
+      await utils.bookmarks.list.invalidate();
+    } catch { toast.error("Failed to update"); }
+  };
 
   const filteredCourses = useMemo(() => {
     if (!coursesQuery.data) return [];
@@ -100,7 +127,7 @@ export default function Courses() {
           <h1 className="text-4xl font-bold text-slate-900 mb-2">Compare & Discover Courses</h1>
           <p className="text-lg text-slate-600">
             <Globe className="w-5 h-5 inline mr-1" />
-            {coursesQuery.data?.length || "Many"} courses from top platforms, ranked by AI
+            {coursesQuery.data?.length || "Many"} real courses from Udemy, Coursera, edX & YouTube — ranked by ratings
           </p>
         </div>
       </motion.div>
@@ -201,7 +228,7 @@ export default function Courses() {
                               <div className="flex items-start justify-between mb-2">
                                 <h3 className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-2 flex-1 text-lg">{course.title}</h3>
                                 <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ml-2 ${course.difficulty === "beginner" ? "bg-emerald-100 text-emerald-700" :
-                                    course.difficulty === "intermediate" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                                  course.difficulty === "intermediate" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
                                   }`}>{course.difficulty}</span>
                               </div>
                               <div className="flex items-center gap-2">
@@ -227,7 +254,16 @@ export default function Courses() {
                                   <span>{((course.learnerCount || 0) / 1000).toFixed(0)}K</span>
                                 </div>
                               </div>
-                              <p className="text-sm text-slate-500 mb-4">By <span className="font-semibold text-slate-700">{course.instructor}</span></p>
+                              <div className="flex items-center justify-between mb-4">
+                                <p className="text-sm text-slate-500">By <span className="font-semibold text-slate-700">{course.instructor}</span></p>
+                                <button
+                                  onClick={(e) => handleToggleBookmark(course.id, e)}
+                                  className={`p-2 rounded-lg transition-colors ${bookmarkedIds.has(course.id) ? "text-blue-600 bg-blue-50 hover:bg-red-50 hover:text-red-500" : "text-slate-400 hover:text-blue-600 hover:bg-blue-50"}`}
+                                  title={bookmarkedIds.has(course.id) ? "Remove from saved" : "Save to my list"}
+                                >
+                                  {bookmarkedIds.has(course.id) ? <BookmarkCheck className="w-5 h-5" /> : <Bookmark className="w-5 h-5" />}
+                                </button>
+                              </div>
                               <Button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-xl shadow-md shadow-blue-500/15 group-hover:shadow-lg transition-all">
                                 Compare & View <ExternalLink className="w-4 h-4 ml-2" />
                               </Button>

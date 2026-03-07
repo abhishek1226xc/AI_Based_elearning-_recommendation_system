@@ -95,10 +95,10 @@ export default function Home() {
   const heroOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
 
   const stats = [
-    { end: 50, suffix: "K+", label: "Courses Indexed" },
-    { end: 10, suffix: "+", label: "Platforms Tracked" },
-    { end: 95, suffix: "%", label: "Match Accuracy" },
-    { end: 24, suffix: "/7", label: "Live Updates" },
+    { end: 20, suffix: "+", label: "Courses Indexed" },
+    { end: 6, suffix: "", label: "Platforms Tracked" },
+    { end: 4, suffix: " Algorithms", label: "ML Models" },
+    { end: 12, suffix: "+", label: "Cross-Platform Comparisons" },
   ];
 
   const features = [
@@ -212,7 +212,7 @@ export default function Home() {
                   ))}
                 </div>
                 <p className="text-sm text-slate-600">
-                  <span className="font-bold text-slate-900">50,000+</span> courses indexed across platforms
+                  <span className="font-bold text-slate-900">20+</span> real courses from Udemy, Coursera, edX & more
                 </p>
               </motion.div>
             </motion.div>
@@ -227,9 +227,9 @@ export default function Home() {
               <div className="relative bg-white/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/50">
                 <div className="space-y-4">
                   {[
-                    { icon: Sparkles, text: "AI-Powered Recommendations", bg: "bg-blue-50", iconColor: "text-blue-600", progress: 92 },
-                    { icon: TrendingUp, text: "Track Your Progress", bg: "bg-emerald-50", iconColor: "text-emerald-600", progress: 78 },
-                    { icon: Users, text: "Learn from Experts", bg: "bg-purple-50", iconColor: "text-purple-600", progress: 85 },
+                    { icon: Sparkles, text: "Content-Based Filtering", bg: "bg-blue-50", iconColor: "text-blue-600", progress: 100 },
+                    { icon: TrendingUp, text: "Collaborative Filtering", bg: "bg-emerald-50", iconColor: "text-emerald-600", progress: 100 },
+                    { icon: Users, text: "Hybrid ML Recommendations", bg: "bg-purple-50", iconColor: "text-purple-600", progress: 100 },
                   ].map((item, i) => (
                     <motion.div
                       key={i}
@@ -363,7 +363,7 @@ export default function Home() {
               Ready to Transform Your Learning?
             </motion.h2>
             <p className="text-xl text-slate-300 mb-10 max-w-2xl mx-auto">
-              Join thousands of learners who are already advancing their careers with personalized, AI-powered learning paths.
+              Compare real courses across 6 platforms, get AI recommendations tailored to your goals, and find the best course — free.
             </p>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button
@@ -392,29 +392,29 @@ export default function Home() {
               <p className="text-sm leading-relaxed">Personalized learning powered by artificial intelligence. Learn at your own pace, guided by AI.</p>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Courses</h4>
+              <h4 className="font-semibold text-white mb-4">Browse by Category</h4>
               <ul className="space-y-2.5 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">Web Development</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Data Science</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Machine Learning</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Cloud Computing</a></li>
+                <li><a href="/courses" className="hover:text-white transition-colors">Web Development</a></li>
+                <li><a href="/courses" className="hover:text-white transition-colors">Data Science & Analytics</a></li>
+                <li><a href="/courses" className="hover:text-white transition-colors">Machine Learning & AI</a></li>
+                <li><a href="/courses" className="hover:text-white transition-colors">Cloud & DevOps</a></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Company</h4>
+              <h4 className="font-semibold text-white mb-4">Platforms Tracked</h4>
               <ul className="space-y-2.5 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">About Us</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
+                <li><a href="https://www.udemy.com" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Udemy</a></li>
+                <li><a href="https://www.coursera.org" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Coursera</a></li>
+                <li><a href="https://www.edx.org" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">edX</a></li>
+                <li><a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">YouTube</a></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Legal</h4>
+              <h4 className="font-semibold text-white mb-4">Quick Links</h4>
               <ul className="space-y-2.5 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Cookie Policy</a></li>
+                <li><a href="/courses" className="hover:text-white transition-colors">Explore Courses</a></li>
+                <li><a href="/auth" className="hover:text-white transition-colors">Sign In / Register</a></li>
+                <li><a href="/dashboard" className="hover:text-white transition-colors">Dashboard</a></li>
               </ul>
             </div>
           </div>
