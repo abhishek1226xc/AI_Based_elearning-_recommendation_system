@@ -4,6 +4,7 @@
  *
  * Run with: pnpm seed (or npx tsx seed-db.ts)
  */
+// HERE ARE THE COURCES ARE THERE DETAILS WHICH ARE PROVIDED IN THE COURSES TABLE IN THE DATABASE
 
 import "dotenv/config";
 import Database from "better-sqlite3";
@@ -376,6 +377,237 @@ const coursesData = [
         platform: "Udemy", platformUrl: "https://www.udemy.com/course/android-kotlin-developer/",
         platformPrice: "$14.99", rating: 465, platformRating: 465, reviewCount: 22000, learnerCount: 180000, completionRate: 55,
     },
+    // Deep Learning Related Courses
+    {
+        title: "Convolutional Neural Networks for Image Classification",
+        description: "Master CNNs from scratch. Learn about filters, pooling, architectures like VGG, ResNet, and more.",
+        category: "Artificial Intelligence", difficulty: "advanced",
+        tags: ["Deep Learning", "CNN", "Computer Vision", "Neural Networks", "PyTorch"],
+        instructor: "Carver Cowan", duration: 2880,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/convolutional-neural-networks-cnn/",
+        platformPrice: "$12.99", rating: 475, platformRating: 475, reviewCount: 18500, learnerCount: 95000, completionRate: 52,
+    },
+    {
+        title: "Recurrent Neural Networks - RNN & LSTM",
+        description: "Learn RNNs, LSTMs, and GRUs for sequence modeling, time series, and NLP applications.",
+        category: "Artificial Intelligence", difficulty: "advanced",
+        tags: ["Deep Learning", "RNN", "LSTM", "Sequence Modeling", "NLP"],
+        instructor: "Jason Brownlee", duration: 1620,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/recurrent-neural-networks/",
+        platformPrice: "$14.99", rating: 470, platformRating: 470, reviewCount: 12000, learnerCount: 65000, completionRate: 48,
+    },
+    {
+        title: "Generative Adversarial Networks (GANs)",
+        description: "Build GANs from scratch. Learn how to generate images, videos, and synthetic data with GANs.",
+        category: "Artificial Intelligence", difficulty: "advanced",
+        tags: ["Deep Learning", "GANs", "Generative Models", "Computer Vision"],
+        instructor: "Dipesh Batavia", duration: 1440,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/generative-adversarial-networks/",
+        platformPrice: "$13.99", rating: 465, platformRating: 465, reviewCount: 8900, learnerCount: 42000, completionRate: 38,
+    },
+    {
+        title: "Natural Language Processing with Deep Learning",
+        description: "Master NLP with transformers, BERT, GPT. Build chatbots, sentiment analysis, and text summarization.",
+        category: "Artificial Intelligence", difficulty: "advanced",
+        tags: ["NLP", "Deep Learning", "Transformers", "BERT", "GPT"],
+        instructor: "Gidi Shperber", duration: 2700,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/nlp-natural-language-processing/",
+        platformPrice: "$14.99", rating: 480, platformRating: 480, reviewCount: 22000, learnerCount: 120000, completionRate: 54,
+    },
+    {
+        title: "PyTorch for Deep Learning",
+        description: "Learn PyTorch from basics to advanced. Build neural networks, GANs, and reinforcement learning models.",
+        category: "Machine Learning", difficulty: "intermediate",
+        tags: ["PyTorch", "Deep Learning", "Neural Networks", "Python"],
+        instructor: "Jose Portilla", duration: 1800,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/pytorch-for-deep-learning/",
+        platformPrice: "$12.99", rating: 475, platformRating: 475, reviewCount: 32000, learnerCount: 185000, completionRate: 61,
+    },
+    // Data Science Related Courses
+    {
+        title: "Data Science Bootcamp 2024",
+        description: "Complete data science bootcamp. Python, statistics, machine learning, and real-world projects.",
+        category: "Data Science", difficulty: "beginner",
+        tags: ["Data Science", "Python", "Statistics", "Pandas", "Scikit-learn"],
+        instructor: "Rob Percival", duration: 3240,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/the-data-science-bootcamp/",
+        platformPrice: "$12.99", rating: 470, platformRating: 470, reviewCount: 89000, learnerCount: 450000, completionRate: 58,
+    },
+    {
+        title: "Advanced Statistical Analysis with R",
+        description: "Master statistical analysis, hypothesis testing, and regression using R. Real-world datasets included.",
+        category: "Data Science", difficulty: "intermediate",
+        tags: ["Statistics", "R", "Data Analysis", "Regression", "Hypothesis Testing"],
+        instructor: "Brandon Foltz", duration: 2160,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/statistical-analysis-with-r/",
+        platformPrice: "$13.99", rating: 465, platformRating: 465, reviewCount: 15500, learnerCount: 78000, completionRate: 51,
+    },
+    {
+        title: "Tableau 2024 Master Class",
+        description: "Learn Tableau for data visualization. Build dashboards and deploy to Tableau Server.",
+        category: "Data Science", difficulty: "beginner",
+        tags: ["Tableau", "Data Visualization", "BI", "Dashboards"],
+        instructor: "Nick Barattini", duration: 1560,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/tableau-training/",
+        platformPrice: "$14.99", rating: 475, platformRating: 475, reviewCount: 42000, learnerCount: 220000, completionRate: 68,
+    },
+    {
+        title: "Time Series Forecasting & Analysis",
+        description: "Master time series analysis with ARIMA, SARIMA, Prophet. Real financial and stock data.",
+        category: "Data Science", difficulty: "intermediate",
+        tags: ["Time Series", "Forecasting", "ARIMA", "Data Science", "Statistics"],
+        instructor: "Andrey Zimovnov", duration: 1440,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/time-series-analysis/",
+        platformPrice: "$13.99", rating: 460, platformRating: 460, reviewCount: 12000, learnerCount: 62000, completionRate: 45,
+    },
+    {
+        title: "Feature Engineering for Machine Learning",
+        description: "Learn feature engineering techniques to improve model performance. Real-world case studies.",
+        category: "Machine Learning", difficulty: "intermediate",
+        tags: ["Feature Engineering", "Machine Learning", "Data Preprocessing", "Python"],
+        instructor: "Pablo Garavito", duration: 1080,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/feature-engineering-machine-learning/",
+        platformPrice: "$12.99", rating: 468, platformRating: 468, reviewCount: 8500, learnerCount: 45000, completionRate: 52,
+    },
+    // Machine Learning Related Courses
+    {
+        title: "Scikit-learn & Machine Learning in Python",
+        description: "Master scikit-learn. Classification, regression, clustering, and ensemble methods explained.",
+        category: "Machine Learning", difficulty: "intermediate",
+        tags: ["Scikit-learn", "Machine Learning", "Python", "Classification", "Regression"],
+        instructor: "Gerrit Coetzee", duration: 1440,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/machine-learning-with-scikit-learn/",
+        platformPrice: "$13.99", rating: 470, platformRating: 470, reviewCount: 22000, learnerCount: 125000, completionRate: 57,
+    },
+    {
+        title: "Reinforcement Learning: Theory & Practice",
+        description: "Learn Q-learning, DQN, policy gradients, actor-critic methods. Build game-playing AI.",
+        category: "Artificial Intelligence", difficulty: "advanced",
+        tags: ["Reinforcement Learning", "Q-Learning", "Deep RL", "AI"],
+        instructor: "Phil Tabor", duration: 1800,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/reinforcement-learning/",
+        platformPrice: "$14.99", rating: 460, platformRating: 460, reviewCount: 9500, learnerCount: 52000, completionRate: 40,
+    },
+    {
+        title: "Ensemble Methods in Machine Learning",
+        description: "Master Random Forest, Gradient Boosting, XGBoost. Improve model accuracy with ensembles.",
+        category: "Machine Learning", difficulty: "intermediate",
+        tags: ["Ensemble Methods", "XGBoost", "Random Forest", "Boosting", "Machine Learning"],
+        instructor: "John Elder", duration: 1260,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/ensemble-methods/",
+        platformPrice: "$12.99", rating: 472, platformRating: 472, reviewCount: 7800, learnerCount: 38000, completionRate: 55,
+    },
+    // Web Development Related Courses
+    {
+        title: "Vue.js 3 Complete Course",
+        description: "Master Vue 3 with Composition API. Build real-world apps with routing and state management.",
+        category: "Web Development", difficulty: "intermediate",
+        tags: ["Vue.js", "JavaScript", "Frontend", "Web Development"],
+        instructor: "Anthony Gore", duration: 3600,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/vue-js-complete-guide/",
+        platformPrice: "$13.99", rating: 468, platformRating: 468, reviewCount: 45000, learnerCount: 195000, completionRate: 56,
+    },
+    {
+        title: "Angular 17 & TypeScript Complete Course",
+        description: "Learn Angular 17 with TypeScript, RxJS, and advanced patterns. Build enterprise applications.",
+        category: "Web Development", difficulty: "intermediate",
+        tags: ["Angular", "TypeScript", "Frontend", "RxJS", "Web Development"],
+        instructor: "Maximilian Schwarzmüller", duration: 3780,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/angular-complete-guide/",
+        platformPrice: "$14.99", rating: 470, platformRating: 470, reviewCount: 128000, learnerCount: 580000, completionRate: 52,
+    },
+    {
+        title: "Svelte.js The Complete Guide",
+        description: "Learn Svelte and SvelteKit. Build faster, reactive web applications with less code.",
+        category: "Web Development", difficulty: "intermediate",
+        tags: ["Svelte", "JavaScript", "Frontend", "Web Development", "SvelteKit"],
+        instructor: "Pavlo Osterman", duration: 2520,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/svelte-the-complete-guide/",
+        platformPrice: "$12.99", rating: 462, platformRating: 462, reviewCount: 8200, learnerCount: 42000, completionRate: 48,
+    },
+    {
+        title: "Web Design for Web Developers",
+        description: "Learn design principles, color theory, typography, and UX design. Build beautiful websites.",
+        category: "Web Development", difficulty: "beginner",
+        tags: ["Web Design", "UI/UX", "CSS", "Design Principles", "Typography"],
+        instructor: "Jonas Schmedtmann", duration: 1980,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/web-design-secrets/",
+        platformPrice: "$12.99", rating: 475, platformRating: 475, reviewCount: 32000, learnerCount: 165000, completionRate: 72,
+    },
+    {
+        title: "Responsive Web Design with CSS Grid & Flexbox",
+        description: "Master CSS Grid and Flexbox for modern responsive layouts. Build mobile-first websites.",
+        category: "Web Development", difficulty: "beginner",
+        tags: ["CSS", "Responsive Design", "Flexbox", "Grid", "Web Development"],
+        instructor: "Elaine Parisian", duration: 1440,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/css-grid-flexbox/",
+        platformPrice: "$11.99", rating: 470, platformRating: 470, reviewCount: 28000, learnerCount: 145000, completionRate: 65,
+    },
+    {
+        title: "Full Stack Web Development with MERN",
+        description: "Build full-stack apps with MongoDB, Express, React, Node.js. Real projects included.",
+        category: "Web Development", difficulty: "intermediate",
+        tags: ["MERN", "MongoDB", "Express", "React", "Node.js", "Full Stack"],
+        instructor: "Traversy Media", duration: 2160,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/mern-stack-front-to-back/",
+        platformPrice: "$13.99", rating: 475, platformRating: 475, reviewCount: 52000, learnerCount: 285000, completionRate: 59,
+    },
+    {
+        title: "GraphQL: The Complete Developer Guide",
+        description: "Master GraphQL from basics to advanced. Build APIs with Apollo Server and handle real-world problems.",
+        category: "Web Development", difficulty: "intermediate",
+        tags: ["GraphQL", "Apollo", "API", "JavaScript", "Backend"],
+        instructor: "Stephen Grider", duration: 2100,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/graphql-with-react/",
+        platformPrice: "$14.99", rating: 465, platformRating: 465, reviewCount: 18500, learnerCount: 95000, completionRate: 51,
+    },
+    // AI/NLP Related Courses
+    {
+        title: "Advanced NLP: Transformers and BERT",
+        description: "Learn how transformers work. Fine-tune BERT, GPT-2, T5 for various NLP tasks.",
+        category: "Artificial Intelligence", difficulty: "advanced",
+        tags: ["NLP", "Transformers", "BERT", "Deep Learning", "Hugging Face"],
+        instructor: "Chris McCormick", duration: 1800,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/nlp-transformers/",
+        platformPrice: "$14.99", rating: 478, platformRating: 478, reviewCount: 9200, learnerCount: 48000, completionRate: 42,
+    },
+    {
+        title: "Computer Vision Masterclass",
+        description: "Complete computer vision course. Image processing, object detection, face recognition, and more.",
+        category: "Artificial Intelligence", difficulty: "advanced",
+        tags: ["Computer Vision", "OpenCV", "Deep Learning", "Image Processing"],
+        instructor: "Raghav Pal", duration: 2700,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/computer-vision-masterclass/",
+        platformPrice: "$13.99", rating: 472, platformRating: 472, reviewCount: 21000, learnerCount: 115000, completionRate: 46,
+    },
+    {
+        title: "Speech Recognition and Audio Processing",
+        description: "Build speech recognition systems. Learn audio processing, spectrogram analysis, and voice synthesis.",
+        category: "Artificial Intelligence", difficulty: "advanced",
+        tags: ["Speech Recognition", "Audio Processing", "Deep Learning", "DSP"],
+        instructor: "Valerio Velardo", duration: 1620,
+        platform: "Udemy", platformUrl: "https://www.udemy.com/course/speech-recognition-audio-processing/",
+        platformPrice: "$12.99", rating: 456, platformRating: 456, reviewCount: 4500, learnerCount: 22000, completionRate: 38,
+    },
+    // AI Model Training and Optimization
+    {
+        title: "Transfer Learning & Fine-tuning with Pretrained Models",
+        description: "Master transfer learning. Use pretrained models from ImageNet, COCO, and fine-tune for custom tasks.",
+        category: "Machine Learning", difficulty: "intermediate",
+        tags: ["Transfer Learning", "Deep Learning", "Pretrained Models", "Fine-tuning"],
+        instructor: "Andrej Karpathy inspired", duration: 1440,
+        platform: "Coursera", platformUrl: "https://www.coursera.org/learn/transfer-learning",
+        platformPrice: "Subscription", rating: 475, platformRating: 475, reviewCount: 11000, learnerCount: 85000, completionRate: 48,
+    },
+    {
+        title: "MLOps: Deploying Machine Learning Models",
+        description: "Learn to deploy ML models. Docker, Kubernetes, CI/CD, monitoring, and scaling in production.",
+        category: "DevOps", difficulty: "advanced",
+        tags: ["MLOps", "DevOps", "ML Deployment", "Docker", "Kubernetes"],
+        instructor: "Chip Huyen", duration: 2160,
+        platform: "Coursera", platformUrl: "https://www.coursera.org/learn/machine-learning-engineering-for-production",
+        platformPrice: "Subscription", rating: 480, platformRating: 480, reviewCount: 13500, learnerCount: 95000, completionRate: 36,
+    },
 ];
 
 for (const c of coursesData) {
@@ -387,7 +619,7 @@ for (const c of coursesData) {
         now, now
     );
 }
-console.log(`✅ Seeded ${coursesData.length} courses with platform data`);
+console.log(`✅ Seeded ${coursesData.length} courses with platform data (now with comprehensive coverage for each topic!)`);
 
 // ── Platform Ratings (cross-platform comparison) ─────────────────────
 const insertPlatformRating = db.prepare(
