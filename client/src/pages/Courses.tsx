@@ -4,8 +4,9 @@ import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
-import { Search, Clock, Star, Users, ArrowLeft, BookOpen, X, ExternalLink, Globe, Bookmark, BookmarkCheck } from "lucide-react";
+import { Search, Clock, Star, Users, ArrowLeft, BookOpen, X, ExternalLink, Globe, Bookmark, BookmarkCheck, Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ChatBox } from "@/components/ChatBox";
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -129,7 +130,7 @@ export default function Courses() {
           <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-2">Compare & Discover Courses</h1>
           <p className="text-lg text-slate-600 dark:text-slate-300">
             <Globe className="w-5 h-5 inline mr-1" />
-            {coursesQuery.data?.length || "Many"} real courses from Udemy, Coursera, edX & YouTube — ranked by ratings
+            Explore <span className="font-semibold text-slate-900 dark:text-white">{coursesQuery.data?.length || "1000+"} premium courses</span> — all AI-ranked and ready to learn
           </p>
         </div>
       </motion.div>
@@ -139,10 +140,18 @@ export default function Courses() {
           {/* Sidebar */}
           <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="lg:col-span-1">
             <div className="sticky top-28 space-y-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                <Input placeholder="Search courses..." className="pl-10 rounded-xl border-slate-200 bg-white/80" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-                {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Search Courses</label>
+                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-blue-50 to-purple-50 rounded-full text-xs font-medium text-blue-700">
+                    <Sparkles size={12} /> AI Powered
+                  </span>
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                  <Input placeholder="Try: deep learning, react, python..." className="pl-10 rounded-xl border-slate-200 bg-white/80" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                  {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>}
+                </div>
               </div>
 
               {/* Sort By */}
@@ -290,6 +299,9 @@ export default function Courses() {
           </div>
         </div>
       </div>
+
+      {/* AI Chat Assistant */}
+      <ChatBox />
     </div>
   );
 }

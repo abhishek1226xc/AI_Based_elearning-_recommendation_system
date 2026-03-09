@@ -23,10 +23,16 @@ import {
   removeBookmark,
   getPlatformRatingsForCourse,
   getTopRatedCourses,
+  createChatSession,
+  getChatSessions,
+  getChatMessages,
+  addChatMessage,
+  deleteChatSession,
 } from "./db";
 import { contentBasedRecommendations, collaborativeRecommendations, popularityRecommendations, hybridRecommendations } from "./ml/recommender";
 import { findRelatedCourses, getAIPoweredSuggestions, getTrendingInCategory, getPrerequisiteCourses, getAdvancedCourses } from "./ml/ai-recommender";
 import { sdk } from "./_core/sdk";
+import { aiService } from "./_core/ai";
 
 function hashPassword(pw: string) {
   return createHash("sha256").update(pw).digest("hex");
@@ -98,6 +104,25 @@ export const appRouter = router({
     search: publicProcedure
       .input(z.object({ query: z.string(), limit: z.number().default(20) }))
       .query(async ({ input }) => searchCourses(input.query, input.limit)),
+
+    searchWithAI: publicProcedure
+      .input(z.object({ query: z.string(), limit: z.number().default(20) }))
+      .query(async ({ input }) => {
+        const courses = await searchCourses(input.query, input.limit);
+        // Get related courses for better recommendations
+        if (courses.length > 0) {
+          const firstCourse = courses[0];
+          const related = await findRelatedCourses(firstCourse.id, Math.min(5, input.limit - courses.length));
+          const relatedCourseIds = new Set(related.map(r => r.courseId));
+          // Add related courses that aren't already in results
+          const similarCourses = await getAllCourses(100);
+          const additionalCourses = similarCourses
+            .filter(c => relatedCourseIds.has(c.id) && !courses.find(course => course.id === c.id))
+            .slice(0, Math.max(0, input.limit - courses.length));
+          return [...courses, ...additionalCourses];
+        }
+        return courses;
+      }),
 
     byCategory: publicProcedure
       .input(z.object({ category: z.string(), limit: z.number().default(20) }))
@@ -219,6 +244,156 @@ export const appRouter = router({
       .input(z.object({ courseId: z.number(), limit: z.number().default(3) }))
       .query(async ({ input }) => getAdvancedCourses(input.courseId, input.limit)),
   }),
+
+  chat: router({
+    createSession: protectedProcedure
+      .input(z.object({ title: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => createChatSession(ctx.user.id, input.title)),
+
+    getSessions: protectedProcedure
+      .query(async ({ ctx }) => getChatSessions(ctx.user.id)),
+
+    getMessages: protectedProcedure
+      .input(z.object({ sessionId: z.number() }))
+      .query(async ({ input }) => getChatMessages(input.sessionId)),
+
+    sendMessage: protectedProcedure
+      .input(z.object({
+        sessionId: z.number(),
+        message: z.string(),
+        relatedCourseIds: z.array(z.number()).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Save user message
+        await addChatMessage(input.sessionId, ctx.user.id, "user", input.message, input.relatedCourseIds);
+
+        // Generate AI response based on message
+        const assistantResponse = await generateAIResponse(input.message, input.relatedCourseIds || []);
+
+        // Save assistant message
+        return addChatMessage(
+          input.sessionId,
+          ctx.user.id,
+          "assistant",
+          assistantResponse.message,
+          assistantResponse.courseIds
+        );
+      }),
+
+    deleteSession: protectedProcedure
+      .input(z.object({ sessionId: z.number() }))
+      .mutation(async ({ input }) => deleteChatSession(input.sessionId)),
+  }),
 });
+
+/**
+ * Generate AI response for chat messages using real AI API
+ * Uses OpenAI, Groq, or Anthropic to provide intelligent course recommendations
+ */
+async function generateAIResponse(userMessage: string, _courseIds: number[]): Promise<{ message: string; courseIds: number[] }> {
+  try {
+    // Search for relevant courses
+    const courseResults = await searchCourses(userMessage, 15);
+    const recommendedIds = courseResults.slice(0, 8).map(c => c.id);
+
+    // Try to use real AI service
+    let aiResponse = "";
+    
+    try {
+      // Build system prompt with course information
+      const courseSummary = courseResults.slice(0, 5)
+        .map(c => `- ${c.title} (${c.category}, ${c.difficulty})`)
+        .join("\n");
+
+      const systemPrompt = `You are an expert AI learning assistant for an online course platform. Help users find the perfect courses.
+
+Available course categories: Web Development, Data Science, Machine Learning, Mobile Development, Cloud Computing, Cybersecurity, Python, and more.
+
+Rules:
+- Be enthusiastic and encouraging
+- Give specific course recommendations when relevant
+- Consider skill level (beginner, intermediate, advanced)
+- Be concise (max 200 words)
+- Use emojis to be friendly
+- Ask clarifying questions if needed`;
+
+      const messages = [
+        { role: "system" as const, content: systemPrompt },
+        { role: "user" as const, content: userMessage },
+      ];
+
+      // Call AI service
+      aiResponse = await aiService.generateResponse(messages);
+      
+      console.log("✅ AI Response received:", aiResponse.substring(0, 100));
+    } catch (aiError) {
+      console.warn("⚠️ AI service failed, using intelligent fallback", aiError);
+      // Fallback to smart keyword-based response
+      aiResponse = generateSmartResponse(userMessage, courseResults);
+    }
+
+    return {
+      message: aiResponse,
+      courseIds: recommendedIds,
+    };
+  } catch (error) {
+    console.error("❌ Error in generateAIResponse:", error);
+    // Last resort fallback
+    return {
+      message: "I'm having trouble processing your request. Please try asking about a specific technology like 'Python courses' or 'React courses'.",
+      courseIds: [],
+    };
+  }
+}
+
+/**
+ * Smart fallback response when AI API is unavailable
+ */
+function generateSmartResponse(userMessage: string, courseResults: any[]): string {
+  const lower = userMessage.toLowerCase();
+  
+  if (courseResults.length === 0) {
+    return `I couldn't find courses matching "${userMessage}". Try searching for specific technologies like Python, React, Cloud Computing, or Data Science.`;
+  }
+
+  let response = "";
+
+  // Detect intent
+  if (lower.includes("recommend") || lower.includes("best") || lower.includes("suggest")) {
+    response = `✅ Based on your search, here are my top recommendations:\n\n`;
+    courseResults.slice(0, 3).forEach((c, i) => {
+      response += `${i + 1}. **${c.title}** (${c.difficulty})\n`;
+    });
+    response += `\nEach course includes hands-on projects, expert instruction, and certificates. Click any course to see more details!`;
+  } 
+  else if (lower.includes("beginner") || lower.includes("start")) {
+    response = `🎓 Great! I found beginner-friendly courses perfect for starting your learning journey:\n\n`;
+    courseResults.slice(0, 3).forEach(c => {
+      if (c.difficulty === "beginner") {
+        response += `• **${c.title}** - ${c.category}\n`;
+      }
+    });
+    response += `\nStart with any of these courses. They build from fundamentals to real projects!`;
+  }
+  else if (lower.includes("advanced") || lower.includes("expert")) {
+    response = `⭐ I found advanced courses for experienced learners:\n\n`;
+    courseResults.slice(0, 3).forEach(c => {
+      if (c.difficulty === "advanced") {
+        response += `• **${c.title}** - ${c.category}\n`;
+      }
+    });
+    response += `\nThese courses dive deep into specialized topics and optimization techniques.`;
+  }
+  else {
+    response = `🚀 I found ${courseResults.length} courses matching your search!\n\n`;
+    response += `Top results:\n`;
+    courseResults.slice(0, 3).forEach((c, i) => {
+      response += `${i + 1}. ${c.title} (${c.category})\n`;
+    });
+    response += `\nClick on any course to enroll and start learning today!`;
+  }
+
+  return response;
+}
 
 export type AppRouter = typeof appRouter;

@@ -80,13 +80,13 @@ export default function AuthPage() {
                             <span className="bg-gradient-to-r from-cyan-300 to-amber-300 bg-clip-text text-transparent">Anywhere.</span>
                         </h1>
                         <p className="text-blue-100 text-lg mb-8 max-w-md">
-                            AI-powered recommendations across Udemy, Coursera, edX & more.
-                            Compare ratings, reviews, and prices in one place.
+                            AI-powered recommendations for 1000+ courses.
+                            Compare ratings, reviews, and find your perfect match in one place.
                         </p>
                         <div className="grid grid-cols-2 gap-4 max-w-sm">
                             {[
-                                { n: "6", l: "Platforms Tracked" },
-                                { n: "20+", l: "Real Courses" },
+                                { n: "1000+", l: "Courses Available" },
+                                { n: "50+", l: "Learning Topics" },
                                 { n: "4 ML", l: "Algorithms Used" },
                                 { n: "100%", l: "Free to Use" },
                             ].map((s, i) => (

@@ -7,6 +7,7 @@ import { ArrowRight, BookOpen, Sparkles, Users, TrendingUp, Zap, GraduationCap, 
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ChatBox } from "@/components/ChatBox";
 
 // Animated counter hook
 function useCounter(end: number, duration = 2000, startOnView = true) {
@@ -214,7 +215,7 @@ export default function Home() {
                   ))}
                 </div>
                 <p className="text-sm text-slate-600">
-                  <span className="font-bold text-slate-900">20+</span> real courses from Udemy, Coursera, edX & more
+                  <span className="font-bold text-slate-900">1000+</span> amazing courses curated for you
                 </p>
               </motion.div>
             </motion.div>
@@ -425,6 +426,9 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      {/* AI Chat Assistant */}
+      <ChatBox />
     </div>
   );
 }
