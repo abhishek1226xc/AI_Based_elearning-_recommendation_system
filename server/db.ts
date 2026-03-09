@@ -13,11 +13,16 @@ import {
   recommendations,
   platformRatings,
   bookmarks,
+  chatSessions,
+  chatMessages,
   type Course,
   type UserProfile,
   type UserProgressRecord,
   type CourseInteraction,
   type Recommendation,
+  type ChatSession,
+  type ChatMessage,
+  type InsertChatMessage,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -408,4 +413,78 @@ export async function getTopRatedCourses(limit = 20) {
   const db = getDb();
   if (!db) return [];
   return db.select().from(courses).orderBy(desc(courses.rating)).limit(limit);
+}
+
+// ── Chat Functions ──────────────────────────────────────────────────
+export async function createChatSession(userId: number, title?: string): Promise<ChatSession | undefined> {
+  const db = getDb();
+  if (!db) return undefined;
+  try {
+    const result = await db.insert(chatSessions).values({
+      userId,
+      title: title || "New Chat",
+    });
+    const session = await db.select().from(chatSessions)
+      .where(eq(chatSessions.userId, userId))
+      .orderBy(desc(chatSessions.createdAt))
+      .limit(1);
+    return session.length > 0 ? session[0] : undefined;
+  } catch (error) {
+    console.error("[Database] Failed to create chat session:", error);
+    return undefined;
+  }
+}
+
+export async function getChatSessions(userId: number): Promise<ChatSession[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(chatSessions)
+    .where(eq(chatSessions.userId, userId))
+    .orderBy(desc(chatSessions.updatedAt));
+}
+
+export async function getChatMessages(sessionId: number): Promise<ChatMessage[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(chatMessages)
+    .where(eq(chatMessages.sessionId, sessionId))
+    .orderBy(desc(chatMessages.createdAt));
+}
+
+export async function addChatMessage(
+  sessionId: number,
+  userId: number,
+  role: "user" | "assistant",
+  content: string,
+  relatedCourseIds?: number[]
+): Promise<ChatMessage | undefined> {
+  const db = getDb();
+  if (!db) return undefined;
+  try {
+    await db.insert(chatMessages).values({
+      sessionId,
+      userId,
+      role,
+      content,
+      relatedCourseIds: relatedCourseIds ? JSON.stringify(relatedCourseIds) : null,
+    });
+    const message = await db.select().from(chatMessages)
+      .where(eq(chatMessages.sessionId, sessionId))
+      .orderBy(desc(chatMessages.createdAt))
+      .limit(1);
+    return message.length > 0 ? message[0] : undefined;
+  } catch (error) {
+    console.error("[Database] Failed to add chat message:", error);
+    return undefined;
+  }
+}
+
+export async function deleteChatSession(sessionId: number): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  try {
+    await db.delete(chatSessions).where(eq(chatSessions.id, sessionId));
+  } catch (error) {
+    console.error("[Database] Failed to delete chat session:", error);
+  }
 }

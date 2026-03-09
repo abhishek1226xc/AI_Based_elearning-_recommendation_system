@@ -6,6 +6,7 @@ import { useLocation } from "wouter";
 import { ArrowRight, BookOpen, Sparkles, Users, TrendingUp, Zap, GraduationCap, Brain, Trophy, ChevronDown } from "lucide-react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 // Animated counter hook
 function useCounter(end: number, duration = 2000, startOnView = true) {
@@ -111,13 +112,13 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 overflow-x-hidden">
       {/* Navigation */}
       <motion.nav
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.6, ease: "easeOut" }}
-        className="sticky top-0 z-50 glass border-b border-white/20"
+        className="sticky top-0 z-50 glass border-b border-white/20 dark:border-slate-700 dark:bg-slate-800/80"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <motion.div
@@ -129,9 +130,10 @@ export default function Home() {
             <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
               <BookOpen className="w-6 h-6 text-white" />
             </div>
-            <span className="text-xl font-bold text-slate-900">EduAI</span>
+            <span className="text-xl font-bold text-slate-900 dark:text-white\">EduAI</span>
           </motion.div>
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button variant="ghost" onClick={() => navigate("/courses")} className="font-medium">
                 Courses

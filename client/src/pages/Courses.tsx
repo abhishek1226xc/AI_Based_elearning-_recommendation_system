@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
 import { Search, Clock, Star, Users, ArrowLeft, BookOpen, X, ExternalLink, Globe, Bookmark, BookmarkCheck } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -101,17 +102,18 @@ export default function Courses() {
   const activeFilters = [searchQuery, selectedCategory, selectedDifficulty].filter(Boolean).length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       {/* Nav */}
-      <motion.nav initial={{ y: -100 }} animate={{ y: 0 }} transition={{ duration: 0.5 }} className="sticky top-0 z-50 glass border-b border-white/20">
+      <motion.nav initial={{ y: -100 }} animate={{ y: 0 }} transition={{ duration: 0.5 }} className="sticky top-0 z-50 glass border-b border-white/20 dark:border-slate-700 dark:bg-slate-800/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <motion.div className="flex items-center gap-2 cursor-pointer" whileHover={{ scale: 1.05 }} onClick={() => navigate("/")}>
             <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
               <BookOpen className="w-6 h-6 text-white" />
             </div>
-            <span className="text-xl font-bold text-slate-900">EduAI</span>
+            <span className="text-xl font-bold text-slate-900 dark:text-white">EduAI</span>
           </motion.div>
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <Button variant="ghost" onClick={() => navigate("/dashboard")} className="font-medium">Dashboard</Button>
             <Button variant="outline" onClick={() => navigate("/")} className="rounded-xl">Home</Button>
           </div>
@@ -119,13 +121,13 @@ export default function Courses() {
       </motion.nav>
 
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white/50 backdrop-blur-sm border-b border-slate-200/50">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm border-b border-slate-200/50 dark:border-slate-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <Button variant="ghost" onClick={() => navigate("/")} className="mb-4 -ml-2 text-slate-500 hover:text-slate-900">
+          <Button variant="ghost" onClick={() => navigate("/")} className="mb-4 -ml-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Home
           </Button>
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">Compare & Discover Courses</h1>
-          <p className="text-lg text-slate-600">
+          <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-2">Compare & Discover Courses</h1>
+          <p className="text-lg text-slate-600 dark:text-slate-300">
             <Globe className="w-5 h-5 inline mr-1" />
             {coursesQuery.data?.length || "Many"} real courses from Udemy, Coursera, edX & YouTube — ranked by ratings
           </p>

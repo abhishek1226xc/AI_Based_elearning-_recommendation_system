@@ -169,3 +169,33 @@ export const bookmarks = sqliteTable("bookmarks", {
 
 export type Bookmark = typeof bookmarks.$inferSelect;
 export type InsertBookmark = typeof bookmarks.$inferInsert;
+
+/**
+ * Chat sessions for AI learning assistant
+ */
+export const chatSessions = sqliteTable("chatSessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").default("Untitled Chat"),
+  createdAt: integer("createdAt", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
+});
+
+export type ChatSession = typeof chatSessions.$inferSelect;
+export type InsertChatSession = typeof chatSessions.$inferInsert;
+
+/**
+ * Chat messages within sessions
+ */
+export const chatMessages = sqliteTable("chatMessages", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  sessionId: integer("sessionId").notNull().references(() => chatSessions.id, { onDelete: "cascade" }),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: text("role", { enum: ["user", "assistant"] }).notNull(),
+  content: text("content").notNull(),
+  relatedCourseIds: text("relatedCourseIds"), // JSON array of related course IDs
+  createdAt: integer("createdAt", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
+});
+
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = typeof chatMessages.$inferInsert;
