@@ -348,49 +348,94 @@ Rules:
 
 /**
  * Smart fallback response when AI API is unavailable
+ * Generates contextual, personalized responses based on user query
  */
 function generateSmartResponse(userMessage: string, courseResults: any[]): string {
-  const lower = userMessage.toLowerCase();
+  const lower = userMessage.toLowerCase().trim();
+  
+  // Detect greetings and casual messages - respond naturally
+  const greetings = ["hey", "hi", "hello", "sup", "yo", "how's", "how are", "what's up", "howdy", "greetings"];
+  const isGreeting = greetings.some(g => lower.includes(g));
+  
+  if (isGreeting) {
+    const responses = [
+      "Hey there! 👋 What courses are you looking for today?",
+      "Hello! 😊 I'm here to help you find the perfect course. What interests you?",
+      "Hi! What kind of learning are you interested in? I can recommend courses!",
+      "Hey! Ready to learn something new? Tell me what you're interested in!",
+      "What's up! 🚀 I'm your learning assistant. What would you like to explore?",
+    ];
+    return responses[Math.floor(Math.random() * responses.length)];
+  }
+  
+  // Detect casual questions
+  if (lower === "help" || lower === "?" || lower === "what can you do") {
+    return "I can help you find the perfect courses! Just tell me:\n• What technology you want to learn (e.g., 'Python', 'React')\n• Your skill level (beginner, intermediate, advanced)\n• What you're interested in (web development, data science, etc.)\n\nAsk me anything like 'best Python courses' or 'learn JavaScript for beginners'!";
+  }
+  
+  // Extract search keywords from the user message
+  const keywords = lower.split(/\s+/).filter(w => w.length > 2);
   
   if (courseResults.length === 0) {
-    return `I couldn't find courses matching "${userMessage}". Try searching for specific technologies like Python, React, Cloud Computing, or Data Science.`;
+    // Be more helpful when no results found
+    return `Hmm, I didn't find courses for "${userMessage}". Try searching for technologies like Python, JavaScript, React, Node.js, Data Science, Machine Learning, or specific frameworks.`;
   }
 
+  // Detect difficulty level preference
+  const isBeginner = lower.includes("beginner") || lower.includes("start") || lower.includes("learn");
+  const isAdvanced = lower.includes("advanced") || lower.includes("expert") || lower.includes("intermediate");
+  
+  // Filter results by difficulty if user specified
+  let relevantCourses = courseResults;
+  if (isBeginner) {
+    relevantCourses = courseResults.filter(c => c.difficulty === "beginner");
+    if (relevantCourses.length === 0) relevantCourses = courseResults;
+  } else if (isAdvanced) {
+    relevantCourses = courseResults.filter(c => c.difficulty === "advanced" || c.difficulty === "intermediate");
+    if (relevantCourses.length === 0) relevantCourses = courseResults;
+  }
+  
+  relevantCourses = relevantCourses.slice(0, 5);
+  
   let response = "";
-
-  // Detect intent
-  if (lower.includes("recommend") || lower.includes("best") || lower.includes("suggest")) {
-    response = `✅ Based on your search, here are my top recommendations:\n\n`;
-    courseResults.slice(0, 3).forEach((c, i) => {
-      response += `${i + 1}. **${c.title}** (${c.difficulty})\n`;
+  
+  // Detect what user is asking for and respond accordingly
+  if (lower.includes("recommend") || lower.includes("best") || lower.includes("perfect")) {
+    response = `Perfect! Here are my top recommendations for "${userMessage}":\n\n`;
+    relevantCourses.forEach((c, i) => {
+      response += `${i + 1}. **${c.title}** (${c.difficulty} - ${c.category})\n`;
     });
-    response += `\nEach course includes hands-on projects, expert instruction, and certificates. Click any course to see more details!`;
+    response += `\nAll these courses have hands-on projects and certifications. Pick one and start learning!`;
   } 
-  else if (lower.includes("beginner") || lower.includes("start")) {
-    response = `🎓 Great! I found beginner-friendly courses perfect for starting your learning journey:\n\n`;
-    courseResults.slice(0, 3).forEach(c => {
-      if (c.difficulty === "beginner") {
-        response += `• **${c.title}** - ${c.category}\n`;
-      }
+  else if (lower.includes("what") && lower.includes("course")) {
+    response = `Great question! For "${userMessage}", I'd recommend:\n\n`;
+    relevantCourses.forEach((c, i) => {
+      response += `${i + 1}. ${c.title}\n   Category: ${c.category} | Level: ${c.difficulty}\n`;
     });
-    response += `\nStart with any of these courses. They build from fundamentals to real projects!`;
+    response += `\nThese are the best courses matching what you're looking for!`;
   }
-  else if (lower.includes("advanced") || lower.includes("expert")) {
-    response = `⭐ I found advanced courses for experienced learners:\n\n`;
-    courseResults.slice(0, 3).forEach(c => {
-      if (c.difficulty === "advanced") {
-        response += `• **${c.title}** - ${c.category}\n`;
-      }
+  else if (lower.includes("learn")) {
+    response = `Awesome! To learn ${userMessage}, check out these courses:\n\n`;
+    relevantCourses.forEach((c, i) => {
+      response += `${i + 1}. ${c.title}\n`;
     });
-    response += `\nThese courses dive deep into specialized topics and optimization techniques.`;
+    response += `\nEach one is designed to take you from basics to advanced skills. Start with any of them!`;
+  }
+  else if (lower.includes("compare") || lower.includes("vs")) {
+    response = `Here are courses related to "${userMessage}":\n\n`;
+    relevantCourses.forEach((c, i) => {
+      response += `${i + 1}. **${c.title}** - ${c.category} (${c.difficulty})\n`;
+    });
+    response += `\nCompare these options and pick the one that fits your goals best!`;
   }
   else {
-    response = `🚀 I found ${courseResults.length} courses matching your search!\n\n`;
-    response += `Top results:\n`;
-    courseResults.slice(0, 3).forEach((c, i) => {
-      response += `${i + 1}. ${c.title} (${c.category})\n`;
+    // Generic contextualized response
+    const topCourse = relevantCourses[0];
+    response = `For "${userMessage}", I found ${courseResults.length} courses. Here are the best ones:\n\n`;
+    relevantCourses.forEach((c, i) => {
+      response += `${i + 1}. ${c.title} (${c.difficulty})\n`;
     });
-    response += `\nClick on any course to enroll and start learning today!`;
+    response += `\nI especially recommend starting with "${topCourse.title}" - it covers exactly what you need!`;
   }
 
   return response;

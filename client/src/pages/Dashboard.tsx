@@ -76,18 +76,18 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-950">
       <motion.nav initial={{ y: -100 }} animate={{ y: 0 }} className="sticky top-0 z-50 glass border-b border-white/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <motion.div className="flex items-center gap-2 cursor-pointer" whileHover={{ scale: 1.05 }} onClick={() => navigate("/")}>
             <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
               <BookOpen className="w-6 h-6 text-white" />
             </div>
-            <span className="text-xl font-bold text-slate-900">EduAI</span>
+            <span className="text-xl font-bold text-white">EduAI</span>
           </motion.div>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={() => navigate("/courses")} className="font-medium">Courses</Button>
-            <Button variant="outline" onClick={async () => { await logout(); navigate("/auth"); }} className="rounded-xl text-red-600 border-red-200 hover:bg-red-50">
+            <Button variant="ghost" onClick={() => navigate("/courses")} className="font-medium text-slate-100 hover:text-white">Courses</Button>
+            <Button variant="outline" onClick={async () => { await logout(); navigate("/auth"); }} className="rounded-xl text-red-300 border-red-600/50 hover:bg-red-900/50">
               <LogOut className="w-4 h-4 mr-1" /> Sign Out
             </Button>
           </div>
@@ -102,15 +102,9 @@ export default function Dashboard() {
               <motion.h1 initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="text-3xl font-bold">
                 Welcome, {user?.name}! 👋
               </motion.h1>
-              <motion.p initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="text-blue-100 mt-1">
+              <motion.p initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="text-purple-200 mt-1">
                 Your personalized course recommendations
               </motion.p>
-            </div>
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button onClick={() => navigate("/courses")} className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl border border-white/20">
-                <Target className="w-4 h-4 mr-2" /> Explore All Courses
-              </Button>
-            </motion.div>
           </div>
         </div>
       </motion.div>
@@ -123,16 +117,16 @@ export default function Dashboard() {
             return (
               <motion.div key={i} variants={itemVariants}>
                 <Card
-                  className="p-5 border-slate-200/80 bg-white/70 backdrop-blur-sm card-hover cursor-pointer"
+                  className="p-5 border-purple-500/30 bg-slate-800/50 backdrop-blur-sm card-hover cursor-pointer"
                   onClick={s.onClick}
                 >
                   <div className="flex items-center gap-3 mb-3">
                     <div className={`w-11 h-11 bg-gradient-to-br ${s.color} rounded-xl flex items-center justify-center shadow-md`}>
                       <Icon className="w-5 h-5 text-white" />
                     </div>
-                    <p className="text-sm text-slate-500 font-medium">{s.label}</p>
+                    <p className="text-sm text-slate-300 font-medium">{s.label}</p>
                   </div>
-                  <p className="text-3xl font-bold text-slate-900">
+                  <p className="text-3xl font-bold text-white">
                     {typeof s.value === "number" ? <AnimatedNumber value={s.value} suffix={s.suffix || ""} /> : <>{s.value}{s.suffix}</>}
                   </p>
                 </Card>
@@ -146,7 +140,7 @@ export default function Dashboard() {
             {/* AI Recommendations */}
             <div id="ai-recs">
               <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                   <Sparkles className="w-6 h-6 text-violet-500" /> AI-Recommended For You
                 </h2>
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
@@ -170,9 +164,9 @@ export default function Dashboard() {
                 <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {recommendationsQuery.data.map((rec: any, i: number) => (
                     <motion.div key={rec.courseId} variants={itemVariants}>
-                      <Card className="p-5 border-slate-200/80 bg-white/70 card-hover group cursor-pointer" onClick={() => navigate(`/course/${rec.courseId}`)}>
+                      <Card className="p-5 border-purple-500/30 bg-slate-800/50 card-hover group cursor-pointer" onClick={() => navigate(`/course/${rec.courseId}`)}>
                         <div className="flex items-start justify-between mb-2">
-                          <h3 className="font-semibold text-slate-900 flex-1 group-hover:text-blue-600 transition-colors">
+                          <h3 className="font-semibold text-white flex-1 group-hover:text-purple-300 transition-colors">
                             {rec.course?.title || rec.reason}
                           </h3>
                           <span className="bg-gradient-to-r from-blue-100 to-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold ml-2">
@@ -184,7 +178,7 @@ export default function Dashboard() {
                             {rec.course.platform}
                           </span>
                         )}
-                        <p className="text-xs text-slate-500 mb-3 line-clamp-2">{rec.reason}</p>
+                        <p className="text-xs text-slate-400 mb-3 line-clamp-2">{rec.reason}</p>
                         <div className="w-full bg-slate-100 rounded-full h-1.5 mb-4">
                           <motion.div initial={{ width: 0 }} whileInView={{ width: `${Math.min(rec.score, 100)}%` }} viewport={{ once: true }}
                             transition={{ delay: 0.3 + i * 0.1, duration: 0.8 }} className="bg-gradient-to-r from-blue-500 to-indigo-500 h-1.5 rounded-full" />
@@ -197,10 +191,10 @@ export default function Dashboard() {
                   ))}
                 </motion.div>
               ) : (
-                <Card className="p-10 text-center border-slate-200/80 bg-white/60">
-                  <Zap className="w-12 h-12 text-violet-300 mx-auto mb-3" />
-                  <p className="text-slate-700 font-medium mb-2">No recommendations yet</p>
-                  <p className="text-slate-500 text-sm mb-5">Click "Generate New" above to get AI-powered course suggestions based on your interests.</p>
+                <Card className="p-10 text-center border-purple-500/30 bg-slate-800/50">
+                  <Zap className="w-12 h-12 text-purple-400 mx-auto mb-3" />
+                  <p className="text-white font-medium mb-2">No recommendations yet</p>
+                  <p className="text-slate-400 text-sm mb-5">Click "Generate New" above to get AI-powered course suggestions based on your interests.</p>
                   <Button
                     onClick={handleGenerateRecommendations}
                     disabled={generateMutation.isPending}
@@ -219,11 +213,11 @@ export default function Dashboard() {
             {/* Saved Courses */}
             <div id="saved-courses">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                   <Bookmark className="w-6 h-6 text-blue-600" /> Saved Courses
                 </h2>
                 {bookmarksQuery.data && bookmarksQuery.data.length > 0 && (
-                  <span className="text-sm text-slate-500">{bookmarksQuery.data.length} course{bookmarksQuery.data.length > 1 ? "s" : ""} saved</span>
+                  <span className="text-sm text-slate-400">{bookmarksQuery.data.length} course{bookmarksQuery.data.length > 1 ? "s" : ""} saved</span>
                 )}
               </div>
               {bookmarksQuery.isLoading ? (
@@ -232,9 +226,9 @@ export default function Dashboard() {
                 <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {bookmarksQuery.data.map((b: any) => (
                     <motion.div key={b.id} variants={itemVariants}>
-                      <Card className="p-5 border-slate-200/80 bg-white/70 card-hover group cursor-pointer relative" onClick={() => navigate(`/course/${b.courseId}`)}>
+                      <Card className="p-5 border-purple-500/30 bg-slate-800/50 card-hover group cursor-pointer relative" onClick={() => navigate(`/course/${b.courseId}`)}>
                         <div className="flex items-start justify-between mb-2">
-                          <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors flex-1 pr-2">
+                          <h3 className="font-semibold text-white group-hover:text-purple-300 transition-colors flex-1 pr-2">
                             {b.course?.title || `Course #${b.courseId}`}
                           </h3>
                           <div className="flex items-center gap-1">
@@ -244,11 +238,11 @@ export default function Dashboard() {
                           </div>
                         </div>
                         {b.course?.description && (
-                          <p className="text-xs text-slate-500 mb-3 line-clamp-2">{b.course.description}</p>
+                          <p className="text-xs text-slate-400 mb-3 line-clamp-2">{b.course.description}</p>
                         )}
-                        {b.notes && <p className="text-sm text-slate-500 mb-3 italic">"{b.notes}"</p>}
+                        {b.notes && <p className="text-sm text-slate-400 mb-3 italic">"{b.notes}"</p>}
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-sm text-slate-500">
+                          <div className="flex items-center gap-2 text-sm text-slate-400">
                             <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
                             <span className="font-semibold">{((b.course?.rating || 0) / 100).toFixed(1)}</span>
                             <span>·</span>
@@ -276,10 +270,10 @@ export default function Dashboard() {
                   ))}
                 </motion.div>
               ) : (
-                <Card className="p-10 text-center border-slate-200/80 bg-white/60">
-                  <Bookmark className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-700 font-medium mb-2">No saved courses yet</p>
-                  <p className="text-slate-500 text-sm mb-5">Browse courses and click "Save to My List" to save them here for comparison.</p>
+                <Card className="p-10 text-center border-purple-500/30 bg-slate-800/50">
+                  <Bookmark className="w-12 h-12 text-purple-400 mx-auto mb-3" />
+                  <p className="text-white font-medium mb-2">No saved courses yet</p>
+                  <p className="text-slate-400 text-sm mb-5">Browse courses and click "Save to My List" to save them here for comparison.</p>
                   <Button onClick={() => navigate("/courses")} className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600">
                     Explore Courses
                   </Button>
@@ -301,11 +295,11 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            <Card className="p-6 border-slate-200/80 bg-white/70 backdrop-blur-sm">
-              <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Target className="w-5 h-5 text-blue-600" /> How It Works
+            <Card className="p-6 border-purple-500/30 bg-slate-800/50 backdrop-blur-sm">
+              <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                <Target className="w-5 h-5 text-purple-400" /> How It Works
               </h3>
-              <ul className="space-y-3 text-sm text-slate-600">
+              <ul className="space-y-3 text-sm text-slate-400">
                 {[
                   "We index courses from 6 real platforms",
                   "AI compares ratings, reviews, and content",
@@ -313,15 +307,15 @@ export default function Dashboard() {
                   "Click through to learn on the platform",
                 ].map((tip, i) => (
                   <motion.li key={i} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6 + i * 0.1 }} className="flex gap-2">
-                    <span className="text-blue-600 font-bold mt-0.5">✦</span><span>{tip}</span>
+                    <span className="text-purple-400 font-bold mt-0.5">✦</span><span>{tip}</span>
                   </motion.li>
                 ))}
               </ul>
             </Card>
 
-            <Card className="p-6 border-slate-200/80 bg-white/70 backdrop-blur-sm">
-              <h3 className="font-bold text-slate-900 mb-3">Your Profile</h3>
-              <div className="text-sm text-slate-600 space-y-2">
+            <Card className="p-6 border-purple-500/30 bg-slate-800/50 backdrop-blur-sm">
+              <h3 className="font-bold text-white mb-3">Your Profile</h3>
+              <div className="text-sm text-slate-400 space-y-2">
                 <p><span className="font-semibold">Name:</span> {user?.name}</p>
                 <p><span className="font-semibold">Email:</span> {user?.email}</p>
                 <p><span className="font-semibold">Member since:</span> {new Date(user?.createdAt || "").toLocaleDateString()}</p>
@@ -329,12 +323,12 @@ export default function Dashboard() {
             </Card>
 
             {/* Quick Actions */}
-            <Card className="p-6 border-slate-200/80 bg-white/70 backdrop-blur-sm">
-              <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Zap className="w-5 h-5 text-amber-500" /> Quick Actions
+            <Card className="p-6 border-purple-500/30 bg-slate-800/50 backdrop-blur-sm">
+              <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                <Zap className="w-5 h-5 text-purple-400" /> Quick Actions
               </h3>
               <div className="space-y-2">
-                <Button variant="outline" className="w-full justify-start rounded-xl" onClick={() => navigate("/courses")}>
+                <Button variant="outline" className="w-full justify-start rounded-xl border-purple-500/30 text-slate-300 hover:bg-purple-900/50" onClick={() => navigate("/courses")}>
                   <BookOpen className="w-4 h-4 mr-2" /> Browse All Courses
                 </Button>
                 <Button

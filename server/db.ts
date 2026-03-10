@@ -461,17 +461,28 @@ export async function addChatMessage(
   const db = getDb();
   if (!db) return undefined;
   try {
-    await db.insert(chatMessages).values({
+    const result = await db.insert(chatMessages).values({
       sessionId,
       userId,
       role,
       content,
       relatedCourseIds: relatedCourseIds ? JSON.stringify(relatedCourseIds) : null,
     });
+    
+    // Get the inserted message by its ID instead of querying by timestamp
+    // This avoids race conditions where multiple messages have the same second-precision timestamp
+    const insertedId = result.lastInsertRowid;
+    if (!insertedId) {
+      // Fallback: query by timestamp (less reliable but better than nothing)
+      const message = await db.select().from(chatMessages)
+        .where(eq(chatMessages.sessionId, sessionId))
+        .orderBy(desc(chatMessages.createdAt))
+        .limit(1);
+      return message.length > 0 ? message[0] : undefined;
+    }
+    
     const message = await db.select().from(chatMessages)
-      .where(eq(chatMessages.sessionId, sessionId))
-      .orderBy(desc(chatMessages.createdAt))
-      .limit(1);
+      .where(eq(chatMessages.id, Number(insertedId)));
     return message.length > 0 ? message[0] : undefined;
   } catch (error) {
     console.error("[Database] Failed to add chat message:", error);

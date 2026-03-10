@@ -121,7 +121,7 @@ export function ChatBox() {
         transition={{ delay: 0.5, duration: 0.3 }}
         whileHover={{ scale: 1.1 }}
         onClick={() => navigate("/auth")}
-        className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-full p-4 shadow-xl hover:shadow-2xl transition-all z-40 flex items-center gap-2"
+        className="fixed bottom-6 right-6 bg-gradient-to-b from-blue-600 via-slate-800 to-teal-600 text-white p-4 shadow-xl hover:shadow-2xl transition-all z-40 flex items-center gap-2"
         title="Sign in to chat with AI"
       >
         <MessageCircle size={24} />
@@ -139,7 +139,7 @@ export function ChatBox() {
         animate={{ scale: 1 }}
         whileHover={{ scale: 1.1 }}
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-full p-4 shadow-xl hover:shadow-2xl transition-all z-40 group"
+        className="fixed bottom-6 right-6 bg-gradient-to-b from-blue-600 via-slate-800 to-teal-600 text-white p-4 shadow-xl hover:shadow-2xl transition-all z-40 group"
         title="Open chat with AI assistant"
       >
         <div className="relative">
@@ -162,9 +162,9 @@ export function ChatBox() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 20 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-24 right-6 w-full sm:w-96 h-[32rem] flex flex-col bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 z-40 overflow-hidden"
+            className="fixed bottom-24 right-6 w-full sm:w-96 h-[32rem] flex flex-col bg-white dark:bg-slate-950 border-4 border-slate-700 shadow-2xl z-40 overflow-hidden rounded-lg"
           >
-            <div className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white p-4 flex justify-between items-center">
+            <div className="bg-gradient-to-r from-blue-700 via-slate-800 to-teal-700 text-white p-4 flex justify-between items-center">
               <div>
                 <h2 className="font-bold text-lg">🤖 AI Learning Assistant</h2>
                 <p className="text-xs opacity-90">Smart course recommendations</p>
@@ -179,7 +179,7 @@ export function ChatBox() {
               </Button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-slate-50 to-white dark:from-slate-800 dark:to-slate-900">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-slate-100 to-white dark:from-slate-900 dark:to-slate-950">
               <AnimatePresence mode="popLayout">
                 {messages.map((msg, idx) => (
                   <motion.div
@@ -191,14 +191,14 @@ export function ChatBox() {
                     className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className={`max-w-xs px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                      className={`max-w-xs px-4 py-3 text-sm leading-relaxed ${
                         msg.role === "user"
-                          ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-none shadow-md"
-                          : "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-bl-none shadow-sm border border-slate-200 dark:border-slate-700"
+                          ? "bg-blue-600 text-white rounded-lg shadow-md"
+                          : "bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded-lg shadow-sm border-2 border-slate-400 dark:border-slate-600"
                       }`}
                     >
                       <p className="whitespace-pre-wrap">{msg.content}</p>
-                      <p className={`text-xs ${msg.role === "user" ? "text-blue-100" : "text-slate-500 dark:text-slate-400"} mt-1`}>
+                      <p className={`text-xs ${msg.role === "user" ? "text-blue-100" : "text-slate-600 dark:text-slate-400"} mt-1`}>
                         {msg.createdAt.toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -215,15 +215,15 @@ export function ChatBox() {
                     exit={{ opacity: 0 }}
                     className="flex justify-start"
                   >
-                    <div className="bg-slate-100 dark:bg-slate-800 px-4 py-3 rounded-2xl rounded-bl-none">
+                    <div className="bg-slate-200 dark:bg-slate-700 px-4 py-3 rounded-lg">
                       <motion.div
                         animate={{ scale: [1, 1.1, 1] }}
                         transition={{ duration: 0.6, repeat: Infinity }}
                         className="flex gap-1"
                       >
-                        <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                        <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                        <div className="w-2 h-2 bg-pink-500 rounded-full" />
+                        <div className="w-2 h-2 bg-blue-600 rounded-full" />
+                        <div className="w-2 h-2 bg-slate-700 rounded-full" />
+                        <div className="w-2 h-2 bg-teal-600 rounded-full" />
                       </motion.div>
                     </div>
                   </motion.div>
@@ -235,7 +235,7 @@ export function ChatBox() {
 
             <form
               onSubmit={handleSendMessage}
-              className="border-t border-slate-200 dark:border-slate-700 p-4 space-y-3 bg-white dark:bg-slate-900"
+              className="border-t-4 border-slate-700 p-4 space-y-3 bg-white dark:bg-slate-950"
             >
               <div className="flex gap-2">
                 <Input
@@ -243,13 +243,13 @@ export function ChatBox() {
                   onChange={(e) => setInputMessage(e.target.value)}
                   placeholder="Ask me about courses..."
                   disabled={isLoading}
-                  className="text-sm dark:bg-slate-800 dark:text-white dark:border-slate-600 rounded-xl"
+                  className="text-sm dark:bg-slate-800 dark:text-white dark:border-slate-600 border-2 border-slate-400 rounded-lg"
                 />
                 <Button
                   type="submit"
                   disabled={isLoading || !inputMessage.trim()}
                   size="sm"
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl"
+                  className="bg-gradient-to-b from-blue-700 to-teal-700 hover:from-blue-800 hover:to-teal-800 text-white rounded-lg"
                 >
                   <Send size={18} />
                 </Button>
