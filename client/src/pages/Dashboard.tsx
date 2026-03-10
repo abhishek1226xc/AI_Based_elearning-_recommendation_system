@@ -95,19 +95,20 @@ export default function Dashboard() {
       </motion.nav>
 
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <div className="flex justify-between items-center">
-            <div>
-              <motion.h1 initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="text-3xl font-bold">
-                Welcome, {user?.name}! 👋
-              </motion.h1>
-              <motion.p initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="text-purple-200 mt-1">
-                Your personalized course recommendations
-              </motion.p>
-          </div>
-        </div>
-      </motion.div>
+<motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <div className="flex justify-between items-center">
+      <div>
+        <motion.h1 initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="text-3xl font-bold">
+          Welcome, {user?.name}! 👋
+        </motion.h1>
+        <motion.p initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="text-purple-200 mt-1">
+          Your personalized course recommendations
+        </motion.p>
+      </div>
+    </div>       {/* ✅ closes flex div */}
+  </div>         {/* ✅ closes max-w-7xl div */}
+</motion.div>    {/* ✅ closes motion.div */}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* Stats */}
