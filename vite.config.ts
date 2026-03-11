@@ -23,6 +23,26 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-react": ["react", "react-dom"],
+          "vendor-ui": [
+            "@radix-ui/react-accordion",
+            "@radix-ui/react-alert-dialog",
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-dropdown-menu",
+            "@radix-ui/react-popover",
+            "@radix-ui/react-select",
+            "@radix-ui/react-tooltip",
+          ],
+          "vendor-query": ["@tanstack/react-query"],
+          "vendor-trpc": ["@trpc/client", "@trpc/react-query"],
+          "vendor-utils": ["clsx", "date-fns", "superjson", "wouter"],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 400,
   },
   server: {
     host: true,
