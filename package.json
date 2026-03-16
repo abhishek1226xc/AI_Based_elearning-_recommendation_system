@@ -99,7 +99,6 @@
     "autoprefixer": "^10.4.20",
     "drizzle-kit": "^0.31.9",
     "esbuild": "^0.25.0",
-    "pnpm": "^10.15.1",
     "postcss": "^8.4.47",
     "prettier": "^3.6.2",
     "tailwindcss": "^4.1.14",
@@ -109,16 +108,9 @@
     "vite": "^7.1.7",
     "vitest": "^4.0.18"
   },
-  "packageManager": "pnpm@10.4.1+sha512.c753b6c3ad7afa13af388fa6d808035a008e30ea9993f58c6663e2bc5ff21679aa834db094987129aa4d488b86df57f7b634981b2f827cdcacc698cc0cfb88af",
-  "pnpm": {
-    "patchedDependencies": {
-      "wouter@3.7.1": "patches/wouter@3.7.1.patch"
-    },
-    "overrides": {
-      "tailwindcss>nanoid": "3.3.7"
-    },
-    "onlyBuiltDependencies": [
-      "better-sqlite3"
-    ]
+  "overrides": {
+    "tailwindcss": {
+      "nanoid": "3.3.7"
+    }
   }
 }
