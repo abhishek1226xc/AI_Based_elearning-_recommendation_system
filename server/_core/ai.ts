@@ -2,7 +2,7 @@ import axios from "axios";
 import { ENV } from "./env";
 
 interface AIMessage {
-  role: "user" | "assistant";
+  role: "system" | "user" | "assistant";
   content: string;
 }
 
@@ -89,16 +89,24 @@ export class AIService {
     }
 
     try {
+      const systemMessages = messages
+        .filter((message) => message.role === "system")
+        .map((message) => message.content);
+
+      const conversationMessages = messages
+        .filter((message) => message.role !== "system")
+        .map((message) => ({
+          role: message.role,
+          content: message.content,
+        }));
+
       const response = await axios.post(
         "https://api.anthropic.com/v1/messages",
         {
           model: "claude-3-sonnet-20240229",
           max_tokens: 1000,
-          system: "You are an expert educational AI assistant helping users find the perfect online courses. Provide detailed, personalized course recommendations based on their learning goals, skill level, and interests.",
-          messages: messages.map(m => ({
-            role: m.role,
-            content: m.content,
-          })),
+          system: systemMessages.join("\n\n") || "You are an expert educational AI assistant helping users find the perfect online courses. Provide detailed, personalized course recommendations based on their learning goals, skill level, and interests.",
+          messages: conversationMessages,
         },
         {
           headers: {

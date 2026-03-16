@@ -44,6 +44,12 @@ describe("Recommendation Engine", () => {
       expect(typeof collaborativeRecommendations).toBe("function");
     });
 
+    it("should have learning-pattern recommendation function", async () => {
+      const { learningPatternRecommendations } = await import("./recommender");
+      expect(learningPatternRecommendations).toBeDefined();
+      expect(typeof learningPatternRecommendations).toBe("function");
+    });
+
     it("should have popularity recommendation function", async () => {
       const { popularityRecommendations } = await import("./recommender");
       expect(popularityRecommendations).toBeDefined();

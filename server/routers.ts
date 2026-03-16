@@ -22,6 +22,7 @@ import {
   addBookmark,
   removeBookmark,
   getPlatformRatingsForCourse,
+  getSameCategoryCourseComparison,
   getTopRatedCourses,
   createChatSession,
   getChatSessions,
@@ -29,7 +30,7 @@ import {
   addChatMessage,
   deleteChatSession,
 } from "./db";
-import { contentBasedRecommendations, collaborativeRecommendations, popularityRecommendations, hybridRecommendations } from "./ml/recommender";
+import { contentBasedRecommendations, collaborativeRecommendations, popularityRecommendations, hybridRecommendations, learningPatternRecommendations } from "./ml/recommender";
 import { findRelatedCourses, getAIPoweredSuggestions, getTrendingInCategory, getPrerequisiteCourses, getAdvancedCourses } from "./ml/ai-recommender";
 import { sdk } from "./_core/sdk";
 import { aiService } from "./_core/ai";
@@ -136,6 +137,10 @@ export const appRouter = router({
       .input(z.object({ courseId: z.number() }))
       .query(async ({ input }) => getPlatformRatingsForCourse(input.courseId)),
 
+    sameCategoryComparison: publicProcedure
+      .input(z.object({ courseId: z.number(), limit: z.number().default(6) }))
+      .query(async ({ input }) => getSameCategoryCourseComparison(input.courseId, input.limit)),
+
     categories: publicProcedure.query(async () => [
       "Web Development", "Data Science", "Machine Learning",
       "Mobile Development", "DevOps", "Cloud Computing",
@@ -204,14 +209,29 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => getUserRecommendations(ctx.user.id, input.limit)),
 
     generate: protectedProcedure
-      .input(z.object({ algorithm: z.enum(["content-based", "collaborative", "hybrid", "popularity"]).optional() }))
+      .input(z.object({ algorithm: z.enum(["content-based", "collaborative", "hybrid", "popularity", "learning-pattern"]).optional() }))
       .mutation(async ({ ctx, input }) => {
         const userId = ctx.user.id;
         let recs: any[] = [];
-        if (input.algorithm === "collaborative") recs = await collaborativeRecommendations(userId, 10);
+        if (input.algorithm === "learning-pattern") recs = await learningPatternRecommendations(userId, 10);
+        else if (input.algorithm === "collaborative") recs = await collaborativeRecommendations(userId, 10);
         else if (input.algorithm === "popularity") recs = await popularityRecommendations(userId, 10);
         else if (input.algorithm === "hybrid") recs = await hybridRecommendations(userId, 10);
-        else recs = await contentBasedRecommendations(userId, 10);
+        else if (input.algorithm === "content-based") recs = await contentBasedRecommendations(userId, 10);
+        else recs = await learningPatternRecommendations(userId, 10);
+
+        // Sparse profiles/interactions can produce zero ML recs in fresh environments.
+        // Fall back to top-rated courses so the UI always has suggestions to show.
+        if (recs.length === 0) {
+          const fallbackCourses = await getTopRatedCourses(10);
+          recs = fallbackCourses.map((course, index) => ({
+            courseId: course.id,
+            score: Math.max(0.6, Math.min(0.99, (course.rating || 0) / 500)),
+            reason: `Top-rated pick in ${course.category}`,
+            algorithm: input.algorithm || "learning-pattern",
+            rank: index + 1,
+          }));
+        }
 
         const now = new Date();
         const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -226,7 +246,18 @@ export const appRouter = router({
 
     relatedCourses: publicProcedure
       .input(z.object({ courseId: z.number(), limit: z.number().default(5) }))
-      .query(async ({ input }) => findRelatedCourses(input.courseId, input.limit)),
+      .query(async ({ input }) => {
+        const related = await findRelatedCourses(input.courseId, input.limit);
+        if (related.length === 0) return related;
+
+        const allCourses = await getAllCourses(300);
+        const courseMap = new Map(allCourses.map((course) => [course.id, course]));
+
+        return related.map((item) => ({
+          ...item,
+          course: courseMap.get(item.courseId),
+        }));
+      }),
 
     aiSuggestions: protectedProcedure
       .input(z.object({ courseId: z.number(), limit: z.number().default(8) }))
