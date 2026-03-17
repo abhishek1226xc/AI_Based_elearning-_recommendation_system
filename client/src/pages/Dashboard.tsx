@@ -49,7 +49,7 @@ export default function Dashboard() {
 
   const handleGenerateRecommendations = async () => {
     try {
-      await generateMutation.mutateAsync({ algorithm: "hybrid" });
+      await generateMutation.mutateAsync({ algorithm: "learning-pattern" });
       await utils.recommendations.getForUser.invalidate();
       toast.success("Recommendations generated! 🎯");
     } catch {

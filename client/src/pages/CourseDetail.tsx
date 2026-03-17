@@ -13,6 +13,8 @@ const PLATFORM_COLORS: Record<string, string> = {
   "edX": "bg-red-100 text-red-700", "YouTube": "bg-rose-100 text-rose-700",
   "Pluralsight": "bg-pink-100 text-pink-700", "A Cloud Guru": "bg-orange-100 text-orange-700",
   "Khan Academy": "bg-green-100 text-green-700",
+  "freeCodeCamp": "bg-emerald-100 text-emerald-700",
+  "MIT OpenCourseWare": "bg-amber-100 text-amber-700",
 };
 
 const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } } };
@@ -30,7 +32,7 @@ export default function CourseDetail() {
 
   const utils = trpc.useUtils();
   const courseQuery = trpc.courses.getById.useQuery({ id: courseId });
-  const platformRatingsQuery = trpc.courses.platformRatings.useQuery({ courseId });
+  const sameCategoryComparisonQuery = trpc.courses.sameCategoryComparison.useQuery({ courseId, limit: 6 });
   const relatedQuery = trpc.recommendations.relatedCourses.useQuery({ courseId, limit: 5 });
   const aiSuggestionsQuery = trpc.recommendations.aiSuggestions.useQuery({ courseId, limit: 6 }, { enabled: isAuthenticated });
   const bookmarksQuery = trpc.bookmarks.list.useQuery(undefined, { enabled: isAuthenticated });
@@ -98,7 +100,8 @@ export default function CourseDetail() {
 
   const course = courseQuery.data;
   const tags = course.tags ? JSON.parse(course.tags) : [];
-  const platformRatings = platformRatingsQuery.data || [];
+  const comparisonCourses = sameCategoryComparisonQuery.data || [];
+  const comparedPlatformCount = new Set(comparisonCourses.map((item: any) => item.platform)).size;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -185,19 +188,21 @@ export default function CourseDetail() {
               </Card>
             </motion.div>
 
-            {/* Cross-Platform Comparison */}
-            {platformRatings.length > 0 && (
+            {/* Same-Category Course Comparison */}
+            {comparisonCourses.length > 1 && (
               <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
                 <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
                   <Globe className="w-6 h-6 text-blue-600" />
-                  Cross-Platform Comparison
+                  Same-Category Course Comparison
                 </h2>
                 <Card className="mb-8 border-slate-200/80 bg-white/70 backdrop-blur-sm overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead className="bg-slate-50/80">
                         <tr>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Course</th>
                           <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Platform</th>
+                          <th className="px-6 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Level</th>
                           <th className="px-6 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Rating</th>
                           <th className="px-6 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Reviews</th>
                           <th className="px-6 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Price</th>
@@ -205,51 +210,44 @@ export default function CourseDetail() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {/* Main platform first */}
-                        <tr className="bg-blue-50/40">
-                          <td className="px-6 py-4">
-                            <span className={`px-3 py-1 rounded-lg text-xs font-bold ${PLATFORM_COLORS[course.platform || ""] || "bg-slate-100 text-slate-700"}`}>
-                              {course.platform} ★
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                              <span className="font-bold text-slate-900">{((course.platformRating || 0) / 100).toFixed(1)}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-center text-sm font-medium text-slate-700">{(course.reviewCount || 0).toLocaleString()}</td>
-                          <td className="px-6 py-4 text-center"><span className="font-semibold text-emerald-600">{course.platformPrice}</span></td>
-                          <td className="px-6 py-4 text-right">
-                            <a href={course.platformUrl || "#"} target="_blank" rel="noopener noreferrer">
-                              <Button size="sm" className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600">
-                                Go <ExternalLink className="w-3 h-3 ml-1" />
-                              </Button>
-                            </a>
-                          </td>
-                        </tr>
-                        {/* Other platforms */}
-                        {platformRatings.map((pr: any) => (
-                          <tr key={pr.id} className="hover:bg-slate-50/50 transition-colors">
+                        {comparisonCourses.map((comparison: any) => (
+                          <tr key={comparison.courseId} className={comparison.isCurrentCourse ? "bg-blue-50/40" : "hover:bg-slate-50/50 transition-colors"}>
                             <td className="px-6 py-4">
-                              <span className={`px-3 py-1 rounded-lg text-xs font-bold ${PLATFORM_COLORS[pr.platform] || "bg-slate-100 text-slate-700"}`}>
-                                {pr.platform}
+                              <p className="text-sm font-semibold text-slate-900">{comparison.title}</p>
+                              {comparison.isCurrentCourse && (
+                                <span className="mt-1 inline-block px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-100 text-blue-700">
+                                  Current Course
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`px-3 py-1 rounded-lg text-xs font-bold ${PLATFORM_COLORS[comparison.platform || ""] || "bg-slate-100 text-slate-700"}`}>
+                                {comparison.platform}
                               </span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${comparison.difficulty === "beginner" ? "bg-emerald-100 text-emerald-700" :
+                                comparison.difficulty === "intermediate" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                                }`}>{comparison.difficulty}</span>
                             </td>
                             <td className="px-6 py-4 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                                <span className="font-bold text-slate-900">{((pr.rating || 0) / 100).toFixed(1)}</span>
+                                <span className="font-bold text-slate-900">{((comparison.rating || 0) / 100).toFixed(1)}</span>
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-center text-sm font-medium text-slate-700">{(pr.reviewCount || 0).toLocaleString()}</td>
-                            <td className="px-6 py-4 text-center"><span className="font-semibold text-emerald-600">{pr.price}</span></td>
+                            <td className="px-6 py-4 text-center text-sm font-medium text-slate-700">{(comparison.reviewCount || 0).toLocaleString()}</td>
+                            <td className="px-6 py-4 text-center"><span className="font-semibold text-emerald-600">{comparison.platformPrice || "N/A"}</span></td>
                             <td className="px-6 py-4 text-right">
-                              <a href={pr.url || "#"} target="_blank" rel="noopener noreferrer">
-                                <Button size="sm" variant="outline" className="rounded-xl">
-                                  Go <ExternalLink className="w-3 h-3 ml-1" />
-                                </Button>
-                              </a>
+                              {comparison.platformUrl ? (
+                                <a href={comparison.platformUrl} target="_blank" rel="noopener noreferrer">
+                                  <Button size="sm" variant={comparison.isCurrentCourse ? "default" : "outline"} className="rounded-xl">
+                                    Go <ExternalLink className="w-3 h-3 ml-1" />
+                                  </Button>
+                                </a>
+                              ) : (
+                                <span className="text-sm text-slate-400">N/A</span>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -268,7 +266,15 @@ export default function CourseDetail() {
                   {relatedQuery.data.map((rec: any) => (
                     <motion.div key={rec.courseId} variants={itemVariants}>
                       <Card className="p-5 border-slate-200/80 bg-white/70 card-hover cursor-pointer group" onClick={() => navigate(`/course/${rec.courseId}`)}>
-                        <h3 className="font-semibold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">{rec.reason}</h3>
+                        <h3 className="font-semibold text-slate-900 mb-1 group-hover:text-blue-600 transition-colors">
+                          {rec.course?.title || rec.reason}
+                        </h3>
+                        {rec.course && (
+                          <p className="text-xs text-slate-500 mb-2">
+                            {rec.course.platform} • {rec.course.category} • {((rec.course.rating || 0) / 100).toFixed(1)}★
+                          </p>
+                        )}
+                        <p className="text-xs text-slate-500 mb-2 line-clamp-2">{rec.reason}</p>
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-bold text-indigo-600">{Math.round(rec.score * 100)}% match</span>
                           <Button size="sm" variant="ghost" className="text-blue-600">View <ExternalLink className="w-3 h-3 ml-1" /></Button>
@@ -322,7 +328,9 @@ export default function CourseDetail() {
                   {[
                     `${((course.rating || 0) / 100).toFixed(1)}★ rating from ${(course.reviewCount || 0).toLocaleString()} reviews`,
                     `${((course.learnerCount || 0) / 1000).toFixed(0)}K+ learners across platforms`,
-                    platformRatings.length > 0 ? `Compared across ${platformRatings.length + 1} platforms` : "Top-rated in its category",
+                    comparisonCourses.length > 1
+                      ? `Compared with ${comparisonCourses.length - 1} ${course.category} course${comparisonCourses.length - 1 > 1 ? "s" : ""} across ${comparedPlatformCount} platforms`
+                      : "Top-rated in its category",
                     `${course.completionRate}% completion rate`,
                   ].map((item, i) => (
                     <motion.li key={i} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + i * 0.1 }} className="flex gap-2">

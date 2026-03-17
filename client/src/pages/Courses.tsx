@@ -18,6 +18,8 @@ const PLATFORM_COLORS: Record<string, string> = {
   "YouTube": "bg-rose-100 text-rose-700 border-rose-200",
   "Pluralsight": "bg-pink-100 text-pink-700 border-pink-200",
   "Khan Academy": "bg-green-100 text-green-700 border-green-200",
+  "freeCodeCamp": "bg-emerald-100 text-emerald-700 border-emerald-200",
+  "MIT OpenCourseWare": "bg-orange-100 text-orange-700 border-orange-200",
 };
 
 const containerVariants = {
@@ -57,6 +59,11 @@ export default function Courses() {
   const utils = trpc.useUtils();
   const coursesQuery = trpc.courses.list.useQuery({ limit: 100 });
   const categoriesQuery = trpc.courses.categories.useQuery();
+  const topRatedQuery = trpc.courses.topRated.useQuery({ limit: 12 });
+  const recommendationsQuery = trpc.recommendations.getForUser.useQuery(
+    { limit: 20 },
+    { enabled: isAuthenticated }
+  );
   const bookmarksQuery = trpc.bookmarks.list.useQuery(undefined, { enabled: isAuthenticated });
   const addBookmark = trpc.bookmarks.add.useMutation();
   const removeBookmark = trpc.bookmarks.remove.useMutation();
@@ -65,6 +72,18 @@ export default function Courses() {
     if (!bookmarksQuery.data) return new Set<number>();
     return new Set(bookmarksQuery.data.map((b: any) => b.courseId));
   }, [bookmarksQuery.data]);
+
+  const aiRecommendedIds = useMemo(() => {
+    if (isAuthenticated && recommendationsQuery.data && recommendationsQuery.data.length > 0) {
+      return new Set(recommendationsQuery.data.map((rec: any) => rec.courseId));
+    }
+
+    if (topRatedQuery.data && topRatedQuery.data.length > 0) {
+      return new Set(topRatedQuery.data.map((course) => course.id));
+    }
+
+    return new Set<number>();
+  }, [isAuthenticated, recommendationsQuery.data, topRatedQuery.data]);
 
   const handleToggleBookmark = async (courseId: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -93,12 +112,17 @@ export default function Courses() {
     });
     // Sort
     filtered.sort((a, b) => {
+      const aAiRecommended = aiRecommendedIds.has(a.id) ? 1 : 0;
+      const bAiRecommended = aiRecommendedIds.has(b.id) ? 1 : 0;
+      if (aAiRecommended !== bAiRecommended) {
+        return bAiRecommended - aAiRecommended;
+      }
       if (sortBy === "rating") return (b.rating || 0) - (a.rating || 0);
       if (sortBy === "reviews") return (b.reviewCount || 0) - (a.reviewCount || 0);
       return (b.learnerCount || 0) - (a.learnerCount || 0);
     });
     return filtered;
-  }, [coursesQuery.data, searchQuery, selectedCategory, selectedDifficulty, sortBy]);
+  }, [coursesQuery.data, searchQuery, selectedCategory, selectedDifficulty, sortBy, aiRecommendedIds]);
 
   const activeFilters = [searchQuery, selectedCategory, selectedDifficulty].filter(Boolean).length;
 
@@ -223,9 +247,17 @@ export default function Courses() {
             ) : (
               <>
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6 flex items-center justify-between">
-                  <p className="text-sm text-slate-600">
-                    Showing <span className="font-bold text-slate-900">{filteredCourses.length}</span> course{filteredCourses.length !== 1 ? "s" : ""}
-                  </p>
+                  <div>
+                    <p className="text-sm text-slate-600">
+                      Showing <span className="font-bold text-slate-900">{filteredCourses.length}</span> course{filteredCourses.length !== 1 ? "s" : ""}
+                    </p>
+                    {aiRecommendedIds.size > 0 && (
+                      <p className="mt-1 text-xs font-medium text-violet-700 inline-flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        {aiRecommendedIds.size} smart picks highlighted first, including free and YouTube-friendly options
+                      </p>
+                    )}
+                  </div>
                 </motion.div>
 
                 {filteredCourses.length > 0 ? (
@@ -238,9 +270,16 @@ export default function Courses() {
                             <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-blue-50/80 to-indigo-50/80">
                               <div className="flex items-start justify-between mb-2">
                                 <h3 className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-2 flex-1 text-lg">{course.title}</h3>
-                                <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ml-2 ${course.difficulty === "beginner" ? "bg-emerald-100 text-emerald-700" :
-                                  course.difficulty === "intermediate" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
-                                  }`}>{course.difficulty}</span>
+                                <div className="flex items-center gap-2 ml-2">
+                                  {aiRecommendedIds.has(course.id) && (
+                                    <span className="px-2 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap bg-violet-100 text-violet-700 inline-flex items-center gap-1">
+                                      <Sparkles className="w-3 h-3" /> AI
+                                    </span>
+                                  )}
+                                  <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${course.difficulty === "beginner" ? "bg-emerald-100 text-emerald-700" :
+                                    course.difficulty === "intermediate" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                                    }`}>{course.difficulty}</span>
+                                </div>
                               </div>
                               <div className="flex items-center gap-2">
                                 <span className={`px-2 py-0.5 rounded-md text-xs font-bold border ${PLATFORM_COLORS[course.platform || ""] || "bg-slate-100 text-slate-700 border-slate-200"}`}>

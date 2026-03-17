@@ -116,7 +116,7 @@ export const recommendations = sqliteTable("recommendations", {
   courseId: integer("courseId").notNull().references(() => courses.id, { onDelete: "cascade" }),
   score: integer("score"),
   reason: text("reason"),
-  algorithm: text("algorithm", { enum: ["content-based", "collaborative", "hybrid", "popularity"] }).notNull(),
+  algorithm: text("algorithm", { enum: ["content-based", "collaborative", "hybrid", "popularity", "learning-pattern"] }).notNull(),
   rank: integer("rank"),
   generatedAt: integer("generatedAt", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
   expiresAt: integer("expiresAt", { mode: "timestamp" }).notNull(),
