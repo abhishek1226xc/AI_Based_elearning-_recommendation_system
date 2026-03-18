@@ -1,6 +1,13 @@
 # AI API Setup Guide
 
-Your AI chatbot is now ready! To enable real AI responses, configure one of these AI providers:
+Your app now runs in two modes:
+
+- Local AI fallback mode (default): no API keys required
+- Provider mode: add OpenAI/Groq/Anthropic keys for richer model output
+
+If you do nothing, local fallback mode remains active and the app still works.
+
+To enable real AI responses, configure one of these AI providers:
 
 ## Quick Start (Choose One)
 
@@ -51,7 +58,15 @@ ANTHROPIC_API_KEY=your-actual-key-here
 
 ## No API Key?
 
-The chatbot will still work! It uses an intelligent fallback that:
+No problem. The app will continue using local fallback responses.
+
+Fallback mode:
 - Searches your course database
 - Provides smart recommendations
 - Uses keyword matching to understand intent
+
+You can keep this enabled with:
+
+```
+LOCAL_AI_FALLBACK=true
+```

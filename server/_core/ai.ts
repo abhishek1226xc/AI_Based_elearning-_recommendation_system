@@ -12,9 +12,49 @@ interface AIMessage {
  */
 
 export class AIService {
-  private openaiKey = process.env.OPENAI_API_KEY;
-  private groqKey = process.env.GROQ_API_KEY;
-  private anthropicKey = process.env.ANTHROPIC_API_KEY;
+  private get openaiKey() {
+    return process.env.OPENAI_API_KEY;
+  }
+
+  private get groqKey() {
+    return process.env.GROQ_API_KEY;
+  }
+
+  private get anthropicKey() {
+    return process.env.ANTHROPIC_API_KEY;
+  }
+
+  private hasAnyProviderConfigured(): boolean {
+    const openai = this.openaiKey;
+    const groq = this.groqKey;
+    const anthropic = this.anthropicKey;
+
+    return Boolean(
+      (openai && !openai.startsWith("sk-your")) ||
+      (groq && groq.trim().length > 0) ||
+      (anthropic && anthropic.trim().length > 0)
+    );
+  }
+
+  private generateLocalFallback(messages: AIMessage[]): string {
+    const latestUser = [...messages].reverse().find((message) => message.role === "user");
+    const prompt = latestUser?.content?.trim() || "your learning goal";
+
+    const lowered = prompt.toLowerCase();
+    if (lowered.includes("python")) {
+      return "Local AI mode is active (no API keys). For Python, start with beginner fundamentals, then practice with data handling and small automation projects. Search for Python courses and prioritize high-rated beginner/intermediate options with projects.";
+    }
+
+    if (lowered.includes("react") || lowered.includes("web")) {
+      return "Local AI mode is active (no API keys). For web development, follow a sequence: HTML/CSS basics -> JavaScript fundamentals -> React component patterns -> full-stack project deployment.";
+    }
+
+    if (lowered.includes("machine learning") || lowered.includes("ai")) {
+      return "Local AI mode is active (no API keys). A strong ML path is: Python + statistics basics -> supervised learning -> model evaluation -> one end-to-end portfolio project.";
+    }
+
+    return `Local AI mode is active (no API keys). For \"${prompt}\", start with 1 beginner course, complete a guided project, then move to intermediate depth. Focus on courses with strong ratings, meaningful reviews, and clear outcomes.`;
+  }
 
   /**
    * Generate AI response using OpenAI GPT
@@ -128,12 +168,16 @@ export class AIService {
    * Main method - tries OpenAI first, then falls back
    */
   async generateResponse(messages: AIMessage[]): Promise<string> {
+    if (!this.hasAnyProviderConfigured() && ENV.localAiFallbackEnabled) {
+      return this.generateLocalFallback(messages);
+    }
+
     // Try OpenAI first (most reliable)
     if (this.openaiKey && !this.openaiKey.startsWith("sk-your")) {
       try {
         return await this.generateWithOpenAI(messages);
       } catch (error) {
-        console.error("OpenAI failed, trying fallback:", error);
+        console.warn("OpenAI failed, trying fallback");
       }
     }
 
@@ -142,7 +186,7 @@ export class AIService {
       try {
         return await this.generateWithGroq(messages);
       } catch (error) {
-        console.error("Groq failed, trying fallback:", error);
+        console.warn("Groq failed, trying fallback");
       }
     }
 
@@ -151,8 +195,12 @@ export class AIService {
       try {
         return await this.generateWithAnthropic(messages);
       } catch (error) {
-        console.error("Anthropic failed:", error);
+        console.warn("Anthropic failed");
       }
+    }
+
+    if (ENV.localAiFallbackEnabled) {
+      return this.generateLocalFallback(messages);
     }
 
     throw new Error(

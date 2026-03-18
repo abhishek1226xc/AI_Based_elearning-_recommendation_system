@@ -11,6 +11,7 @@ import {
   userProgress,
   courseInteractions,
   recommendations,
+  recommendationFeedback,
   platformRatings,
   bookmarks,
   chatSessions,
@@ -21,6 +22,7 @@ import {
   type UserProgressRecord,
   type CourseInteraction,
   type Recommendation,
+  type RecommendationFeedback,
   type PlatformRating,
   type ChatSession,
   type ChatMessage,
@@ -842,8 +844,16 @@ function getFallbackCourses(limit?: number, offset?: number): Course[] {
   return sorted;
 }
 
+function normalizeSearchInput(query: string): string {
+  return query
+    .trim()
+    .replace(/[%_]/g, " ")
+    .replace(/\s+/g, " ")
+    .slice(0, 120);
+}
+
 function searchFallbackCourses(query: string, limit: number): Course[] {
-  const q = query.trim().toLowerCase();
+  const q = normalizeSearchInput(query).toLowerCase();
   if (!q) return getFallbackCourses(limit, 0);
   return sortCoursesByLearners(FALLBACK_COURSES)
     .filter((course) => {
@@ -890,6 +900,28 @@ function getFallbackRecommendations(
     }));
 }
 
+function ensureRuntimeIndexes(sqlite: Database.Database): void {
+  const statements = [
+    "CREATE INDEX IF NOT EXISTS users_email_idx ON users(email)",
+    "CREATE INDEX IF NOT EXISTS courses_category_rating_idx ON courses(category, rating)",
+    "CREATE INDEX IF NOT EXISTS courses_learnerCount_idx ON courses(learnerCount)",
+    "CREATE INDEX IF NOT EXISTS courseInteractions_user_timestamp_idx ON courseInteractions(userId, timestamp)",
+    "CREATE INDEX IF NOT EXISTS recommendations_user_rank_idx ON recommendations(userId, rank)",
+    "CREATE INDEX IF NOT EXISTS recommendations_expiresAt_idx ON recommendations(expiresAt)",
+    "CREATE INDEX IF NOT EXISTS recommendationFeedback_user_rec_idx ON recommendationFeedback(userId, recommendationId)",
+    "CREATE INDEX IF NOT EXISTS bookmarks_user_created_idx ON bookmarks(userId, createdAt)",
+    "CREATE INDEX IF NOT EXISTS chatMessages_session_created_idx ON chatMessages(sessionId, createdAt)",
+  ];
+
+  for (const statement of statements) {
+    try {
+      sqlite.exec(statement);
+    } catch {
+      // Index creation should never crash app startup.
+    }
+  }
+}
+
 /**
  * Lazily create the drizzle SQLite instance.
  * The DB file is stored at ./data/elearning.db relative to project root.
@@ -919,6 +951,7 @@ export function getDb() {
       const sqlite = new Database(dbPath);
       sqlite.pragma('journal_mode = WAL');
       sqlite.pragma('foreign_keys = ON');
+      ensureRuntimeIndexes(sqlite);
       _db = drizzle(sqlite);
       _dbConnectionError = null;
       _didLogDbConnectionError = false;
@@ -1049,21 +1082,23 @@ export async function getUserByOpenId(openId: string) {
 // Course queries
 export async function getAllCourses(limit: number = 100, offset: number = 0): Promise<Course[]> {
   const db = getDb();
-  if (!db) return getFallbackCourses(limit, offset);
+  const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
+  const safeOffset = Math.max(0, Math.min(10000, Math.trunc(offset)));
+  if (!db) return getFallbackCourses(safeLimit, safeOffset);
 
   try {
     const result = await db
       .select()
       .from(courses)
-      .limit(limit)
-      .offset(offset)
+      .limit(safeLimit)
+      .offset(safeOffset)
       .orderBy(desc(courses.learnerCount));
 
     if (result.length > 0) return result;
-    return getFallbackCourses(limit, offset);
+    return getFallbackCourses(safeLimit, safeOffset);
   } catch (error) {
     console.error("[Database] getAllCourses failed, using fallback data:", error);
-    return getFallbackCourses(limit, offset);
+    return getFallbackCourses(safeLimit, safeOffset);
   }
 }
 
@@ -1088,21 +1123,25 @@ export async function getCourseById(courseId: number): Promise<Course | undefine
 
 export async function searchCourses(query: string, limit: number = 20): Promise<Course[]> {
   const db = getDb();
-  const fallback = searchFallbackCourses(query, limit);
+  const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)));
+  const normalizedQuery = normalizeSearchInput(query);
+  const fallback = searchFallbackCourses(normalizedQuery, safeLimit);
+  if (!normalizedQuery) return fallback;
   if (!db) return fallback;
 
   try {
+    const likePattern = `%${normalizedQuery}%`;
     const result = await db
       .select()
       .from(courses)
       .where(
         or(
-          like(courses.title, `%${query}%`),
-          like(courses.description, `%${query}%`),
-          like(courses.category, `%${query}%`)
+          like(courses.title, likePattern),
+          like(courses.description, likePattern),
+          like(courses.category, likePattern)
         )
       )
-      .limit(limit);
+      .limit(safeLimit);
 
     if (result.length > 0) return result;
     return fallback;
@@ -1114,18 +1153,20 @@ export async function searchCourses(query: string, limit: number = 20): Promise<
 
 export async function getCoursesByCategory(category: string, limit: number = 20): Promise<Course[]> {
   const db = getDb();
-  const normalizedCategory = category.trim().toLowerCase();
+  const trimmedCategory = category.trim().slice(0, 80);
+  const normalizedCategory = trimmedCategory.toLowerCase();
+  const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)));
   const fallback = sortCoursesByLearners(FALLBACK_COURSES)
     .filter((course) => course.category.toLowerCase() === normalizedCategory)
-    .slice(0, limit);
+    .slice(0, safeLimit);
   if (!db) return fallback;
 
   try {
     const result = await db
       .select()
       .from(courses)
-      .where(eq(courses.category, category))
-      .limit(limit)
+      .where(eq(courses.category, trimmedCategory))
+      .limit(safeLimit)
       .orderBy(desc(courses.learnerCount));
 
     if (result.length > 0) return result;
@@ -1477,33 +1518,54 @@ export async function getUserRecommendations(userId: number, limit: number = 10)
   if (!db) return getFallbackRecommendations(userId, limit);
 
   try {
+    const safeLimit = Math.max(1, Math.min(20, Math.trunc(limit)));
     const recs = await db
       .select()
       .from(recommendations)
       .where(eq(recommendations.userId, userId))
       .orderBy(desc(recommendations.rank))
-      .limit(limit);
+      .limit(safeLimit);
 
     if (recs.length === 0) {
-      return getFallbackRecommendations(userId, limit);
+      return getFallbackRecommendations(userId, safeLimit);
     }
 
     // Fetch course details for each recommendation
     const courseIds = recs.map(r => r.courseId);
+    const recIds = recs.map((rec) => rec.id);
+
     const courseDetails = await db
       .select()
       .from(courses)
       .where(inArray(courses.id, courseIds));
 
+    const feedbackRows = recIds.length === 0
+      ? []
+      : await db
+          .select({
+            recommendationId: recommendationFeedback.recommendationId,
+            feedback: recommendationFeedback.feedback,
+          })
+          .from(recommendationFeedback)
+          .where(
+            and(
+              eq(recommendationFeedback.userId, userId),
+              inArray(recommendationFeedback.recommendationId, recIds)
+            )
+          );
+
     const courseMap = new Map(courseDetails.map(c => [c.id, c]));
+    const feedbackMap = new Map(feedbackRows.map((row) => [row.recommendationId, row.feedback]));
+
     const hydratedRecs = recs.map(rec => ({
       ...rec,
       course: courseMap.get(rec.courseId),
+      feedback: feedbackMap.get(rec.id) || null,
     }));
 
     // If recommendations exist but no course rows can be resolved, use fallback.
     if (!hydratedRecs.some((rec) => rec.course)) {
-      return getFallbackRecommendations(userId, limit);
+      return getFallbackRecommendations(userId, safeLimit);
     }
 
     return hydratedRecs;
@@ -1534,6 +1596,173 @@ export async function saveRecommendations(recs: Array<{
     }
   } catch (error) {
     console.error("[Database] Failed to save recommendations:", error);
+  }
+}
+
+export type RecommendationFeedbackValue =
+  | "helpful"
+  | "not-helpful"
+  | "already-taken"
+  | "not-interested";
+
+function recommendationFeedbackWeight(value: RecommendationFeedbackValue): number {
+  if (value === "helpful") return 0.12;
+  if (value === "not-helpful") return -0.08;
+  if (value === "already-taken") return -0.16;
+  if (value === "not-interested") return -0.2;
+  return 0;
+}
+
+export async function submitRecommendationFeedback(
+  userId: number,
+  recommendationId: number,
+  feedback: RecommendationFeedbackValue
+): Promise<RecommendationFeedback | undefined> {
+  const db = getDb();
+  if (!db) return undefined;
+
+  try {
+    const rec = await db
+      .select({ id: recommendations.id })
+      .from(recommendations)
+      .where(and(eq(recommendations.id, recommendationId), eq(recommendations.userId, userId)))
+      .limit(1);
+
+    if (rec.length === 0) return undefined;
+
+    const existing = await db
+      .select()
+      .from(recommendationFeedback)
+      .where(
+        and(
+          eq(recommendationFeedback.userId, userId),
+          eq(recommendationFeedback.recommendationId, recommendationId)
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      await db
+        .update(recommendationFeedback)
+        .set({
+          feedback,
+          timestamp: new Date(),
+        })
+        .where(eq(recommendationFeedback.id, existing[0].id));
+
+      const updated = await db
+        .select()
+        .from(recommendationFeedback)
+        .where(eq(recommendationFeedback.id, existing[0].id))
+        .limit(1);
+
+      return updated[0];
+    }
+
+    await db.insert(recommendationFeedback).values({
+      userId,
+      recommendationId,
+      feedback,
+      timestamp: new Date(),
+    });
+
+    const inserted = await db
+      .select()
+      .from(recommendationFeedback)
+      .where(
+        and(
+          eq(recommendationFeedback.userId, userId),
+          eq(recommendationFeedback.recommendationId, recommendationId)
+        )
+      )
+      .orderBy(desc(recommendationFeedback.timestamp))
+      .limit(1);
+
+    return inserted[0];
+  } catch (error) {
+    console.error("[Database] submitRecommendationFeedback failed:", error);
+    return undefined;
+  }
+}
+
+export async function getUserFeedbackSignals(userId: number): Promise<Map<number, number>> {
+  const db = getDb();
+  const signals = new Map<number, number>();
+  if (!db) return signals;
+
+  try {
+    const rows = await db
+      .select({
+        courseId: recommendations.courseId,
+        feedback: recommendationFeedback.feedback,
+      })
+      .from(recommendationFeedback)
+      .innerJoin(recommendations, eq(recommendationFeedback.recommendationId, recommendations.id))
+      .where(eq(recommendationFeedback.userId, userId));
+
+    for (const row of rows) {
+      if (!row.feedback) continue;
+      const weight = recommendationFeedbackWeight(row.feedback as RecommendationFeedbackValue);
+      const current = signals.get(row.courseId) || 0;
+      signals.set(row.courseId, Math.max(-0.3, Math.min(0.25, current + weight)));
+    }
+
+    return signals;
+  } catch (error) {
+    console.error("[Database] getUserFeedbackSignals failed:", error);
+    return signals;
+  }
+}
+
+export async function getUserRecommendationFeedbackSummary(userId: number): Promise<{
+  total: number;
+  helpful: number;
+  notHelpful: number;
+  alreadyTaken: number;
+  notInterested: number;
+}> {
+  const db = getDb();
+  if (!db) {
+    return {
+      total: 0,
+      helpful: 0,
+      notHelpful: 0,
+      alreadyTaken: 0,
+      notInterested: 0,
+    };
+  }
+
+  try {
+    const rows = await db
+      .select({ feedback: recommendationFeedback.feedback })
+      .from(recommendationFeedback)
+      .where(eq(recommendationFeedback.userId, userId));
+
+    const summary = {
+      total: rows.length,
+      helpful: 0,
+      notHelpful: 0,
+      alreadyTaken: 0,
+      notInterested: 0,
+    };
+
+    for (const row of rows) {
+      if (row.feedback === "helpful") summary.helpful += 1;
+      else if (row.feedback === "not-helpful") summary.notHelpful += 1;
+      else if (row.feedback === "already-taken") summary.alreadyTaken += 1;
+      else if (row.feedback === "not-interested") summary.notInterested += 1;
+    }
+
+    return summary;
+  } catch (error) {
+    console.error("[Database] getUserRecommendationFeedbackSummary failed:", error);
+    return {
+      total: 0,
+      helpful: 0,
+      notHelpful: 0,
+      alreadyTaken: 0,
+      notInterested: 0,
+    };
   }
 }
 
@@ -1604,6 +1833,36 @@ export async function createUser(data: { email: string; name: string; passwordHa
       });
     }
     throw error;
+  }
+}
+
+export async function updateUserPasswordHash(userId: number, passwordHash: string): Promise<void> {
+  const db = getDb();
+
+  if (!db) {
+    if (!canUseInMemoryAuthFallback()) return;
+
+    const existingUser = Array.from(inMemoryUsersByOpenId.values()).find((user) => user.id === userId);
+    if (!existingUser) return;
+
+    upsertInMemoryUser({
+      openId: existingUser.openId,
+      passwordHash,
+      lastSignedIn: new Date(),
+    });
+    return;
+  }
+
+  try {
+    await db
+      .update(users)
+      .set({
+        passwordHash,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  } catch (error) {
+    console.error("[Database] updateUserPasswordHash failed:", error);
   }
 }
 
@@ -1812,5 +2071,85 @@ export async function deleteChatSession(sessionId: number): Promise<void> {
     await db.delete(chatSessions).where(eq(chatSessions.id, sessionId));
   } catch (error) {
     console.error("[Database] Failed to delete chat session:", error);
+  }
+}
+
+export async function getAdminAnalyticsOverview(): Promise<{
+  users: number;
+  courses: number;
+  interactions: number;
+  recommendations: number;
+  feedback: number;
+  helpfulRate: number;
+  dailyActiveUsers: number;
+  topCategories: Array<{ category: string; count: number }>;
+}> {
+  const db = getDb();
+  if (!db) {
+    return {
+      users: 0,
+      courses: FALLBACK_COURSES.length,
+      interactions: 0,
+      recommendations: 0,
+      feedback: 0,
+      helpfulRate: 0,
+      dailyActiveUsers: 0,
+      topCategories: [],
+    };
+  }
+
+  try {
+    const [userRows, courseRows, interactionRows, recommendationRows, feedbackRows] = await Promise.all([
+      db.select({ id: users.id, lastSignedIn: users.lastSignedIn }).from(users),
+      db.select({ id: courses.id, category: courses.category }).from(courses),
+      db.select({ id: courseInteractions.id }).from(courseInteractions),
+      db.select({ id: recommendations.id }).from(recommendations),
+      db.select({ feedback: recommendationFeedback.feedback }).from(recommendationFeedback),
+    ]);
+
+    const now = Date.now();
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+
+    const dailyActiveUsers = userRows.filter((row) => {
+      if (!row.lastSignedIn) return false;
+      return row.lastSignedIn.getTime() >= oneDayAgo;
+    }).length;
+
+    const categoryCounter = new Map<string, number>();
+    for (const row of courseRows) {
+      const category = row.category || "Uncategorized";
+      categoryCounter.set(category, (categoryCounter.get(category) || 0) + 1);
+    }
+
+    const topCategories = Array.from(categoryCounter.entries())
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+
+    const helpfulCount = feedbackRows.filter((row) => row.feedback === "helpful").length;
+    const helpfulRate = feedbackRows.length === 0 ? 0 : Math.round((helpfulCount / feedbackRows.length) * 100);
+
+    return {
+      users: userRows.length,
+      courses: courseRows.length,
+      interactions: interactionRows.length,
+      recommendations: recommendationRows.length,
+      feedback: feedbackRows.length,
+      helpfulRate,
+      dailyActiveUsers,
+      topCategories,
+    };
+  } catch (error) {
+    console.error("[Database] getAdminAnalyticsOverview failed:", error);
+    return {
+      users: 0,
+      courses: 0,
+      interactions: 0,
+      recommendations: 0,
+      feedback: 0,
+      helpfulRate: 0,
+      dailyActiveUsers: 0,
+      topCategories: [],
+    };
   }
 }

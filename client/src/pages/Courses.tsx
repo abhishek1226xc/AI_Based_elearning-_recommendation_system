@@ -49,15 +49,18 @@ function SkeletonCard() {
 }
 
 export default function Courses() {
+  const MAX_VISIBLE_COURSES = 100;
+
   const [, navigate] = useLocation();
   const { isAuthenticated } = useAuth();
+  const [visibleLimit, setVisibleLimit] = useState(24);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"rating" | "reviews" | "learners">("rating");
 
   const utils = trpc.useUtils();
-  const coursesQuery = trpc.courses.list.useQuery({ limit: 100 });
+  const coursesQuery = trpc.courses.list.useQuery({ limit: visibleLimit, offset: 0 });
   const categoriesQuery = trpc.courses.categories.useQuery();
   const topRatedQuery = trpc.courses.topRated.useQuery({ limit: 12 });
   const recommendationsQuery = trpc.recommendations.getForUser.useQuery(
@@ -125,6 +128,10 @@ export default function Courses() {
   }, [coursesQuery.data, searchQuery, selectedCategory, selectedDifficulty, sortBy, aiRecommendedIds]);
 
   const activeFilters = [searchQuery, selectedCategory, selectedDifficulty].filter(Boolean).length;
+  const canLoadMore =
+    !coursesQuery.isLoading &&
+    visibleLimit < MAX_VISIBLE_COURSES &&
+    (coursesQuery.data?.length || 0) >= visibleLimit;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
@@ -261,9 +268,10 @@ export default function Courses() {
                 </motion.div>
 
                 {filteredCourses.length > 0 ? (
-                  <motion.div variants={containerVariants} initial="hidden" animate="visible" className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <AnimatePresence mode="popLayout">
-                      {filteredCourses.map((course) => (
+                  <>
+                    <motion.div variants={containerVariants} initial="hidden" animate="visible" className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <AnimatePresence mode="popLayout">
+                        {filteredCourses.map((course) => (
                         <motion.div key={course.id} variants={cardVariants} layout exit={{ opacity: 0, scale: 0.9 }}>
                           <Card className="overflow-hidden card-hover cursor-pointer border-slate-200/80 bg-white/70 backdrop-blur-sm group"
                             onClick={() => navigate(`/course/${course.id}`)}>
@@ -320,9 +328,22 @@ export default function Courses() {
                             </div>
                           </Card>
                         </motion.div>
-                      ))}
-                    </AnimatePresence>
-                  </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </motion.div>
+
+                    {canLoadMore && (
+                      <div className="mt-8 flex justify-center">
+                        <Button
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() => setVisibleLimit((current) => Math.min(MAX_VISIBLE_COURSES, current + 24))}
+                        >
+                          Load More Courses
+                        </Button>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
                     <Card className="p-16 text-center border-slate-200/80 bg-white/60 backdrop-blur-sm">

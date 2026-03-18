@@ -179,12 +179,12 @@ export default function AuthPage() {
                                     <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                                     <Input
                                         type={showPw ? "text" : "password"}
-                                        placeholder={mode === "register" ? "Minimum 6 characters" : "Enter your password"}
+                                        placeholder={mode === "register" ? "Minimum 8 characters" : "Enter your password"}
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         className="pl-10 pr-10 rounded-xl"
                                         required
-                                        minLength={mode === "register" ? 6 : 1}
+                                        minLength={mode === "register" ? 8 : 1}
                                     />
                                     <button
                                         type="button"

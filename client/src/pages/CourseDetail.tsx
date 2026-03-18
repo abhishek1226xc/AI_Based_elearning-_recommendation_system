@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ChatBox } from "@/components/ChatBox";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation, useRoute } from "wouter";
-import { ArrowLeft, BookOpen, Clock, Star, Users, Sparkles, Loader2, ExternalLink, Award, Bookmark, BookmarkCheck, Globe } from "lucide-react";
+import { ArrowLeft, BookOpen, Clock, Star, Users, Sparkles, Loader2, ExternalLink, Award, Bookmark, BookmarkCheck, Globe, FileQuestion } from "lucide-react";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -21,12 +22,31 @@ const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, trans
 const itemVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5 } } };
 const tagVariants = { hidden: { opacity: 0, scale: 0 }, visible: { opacity: 1, scale: 1, transition: { duration: 0.3 } } };
 
+function parseCourseTags(rawTags: string | null | undefined): string[] {
+  if (!rawTags) return [];
+
+  try {
+    const parsed = JSON.parse(rawTags);
+    if (Array.isArray(parsed)) {
+      return parsed.map((tag) => String(tag)).filter((tag) => tag.length > 0);
+    }
+  } catch {
+    // Fall back to comma-separated tags.
+  }
+
+  return rawTags
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.length > 0);
+}
+
 export default function CourseDetail() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/course/:id");
   const { isAuthenticated } = useAuth();
-  const courseId = params?.id ? parseInt(params.id) : null;
+  const courseId = params?.id ? parseInt(params.id, 10) : null;
   const [bookmarked, setBookmarked] = useState(false);
+  const [quizData, setQuizData] = useState<any | null>(null);
 
   if (!courseId) { navigate("/courses"); return null; }
 
@@ -39,6 +59,7 @@ export default function CourseDetail() {
   const bookmarkAddMutation = trpc.bookmarks.add.useMutation();
   const bookmarkRemoveMutation = trpc.bookmarks.remove.useMutation();
   const recordInteraction = trpc.enrollment.recordInteraction.useMutation();
+  const quizMutation = trpc.recommendations.generateQuiz.useMutation();
 
   // Check if already bookmarked
   useEffect(() => {
@@ -73,6 +94,24 @@ export default function CourseDetail() {
     } catch { toast.error("Failed to update bookmark"); }
   };
 
+  const handleGenerateQuiz = async () => {
+    if (!isAuthenticated) {
+      navigate("/auth");
+      return;
+    }
+
+    try {
+      const quiz = await quizMutation.mutateAsync({
+        courseId,
+        questionCount: 5,
+      });
+      setQuizData(quiz);
+      toast.success("Quiz generated for this course");
+    } catch {
+      toast.error("Could not generate quiz");
+    }
+  };
+
   if (courseQuery.isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
@@ -99,7 +138,7 @@ export default function CourseDetail() {
   }
 
   const course = courseQuery.data;
-  const tags = course.tags ? JSON.parse(course.tags) : [];
+  const tags = parseCourseTags(course.tags);
   const comparisonCourses = sameCategoryComparisonQuery.data || [];
   const comparedPlatformCount = new Set(comparisonCourses.map((item: any) => item.platform)).size;
 
@@ -285,6 +324,32 @@ export default function CourseDetail() {
                 </motion.div>
               </motion.div>
             )}
+
+            {quizData && quizData.questions?.length > 0 && (
+              <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+                <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                  <FileQuestion className="w-6 h-6 text-indigo-600" /> Module Quiz
+                </h2>
+                <Card className="p-6 border-slate-200/80 bg-white/70 backdrop-blur-sm space-y-5 mb-8">
+                  {quizData.questions.map((question: any) => (
+                    <div key={question.id} className="rounded-xl border border-slate-200 p-4 bg-white/90">
+                      <p className="font-semibold text-slate-900 mb-3">{question.id}. {question.question}</p>
+                      <ul className="space-y-2 mb-3">
+                        {question.options.map((option: string, optionIndex: number) => (
+                          <li
+                            key={`${question.id}-${optionIndex}`}
+                            className={`text-sm rounded-lg px-3 py-2 ${optionIndex === question.answerIndex ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}
+                          >
+                            {String.fromCharCode(65 + optionIndex)}. {option}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="text-xs text-slate-600"><span className="font-semibold">Why:</span> {question.explanation}</p>
+                    </div>
+                  ))}
+                </Card>
+              </motion.div>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -318,6 +383,16 @@ export default function CourseDetail() {
                     {bookmarked ? <><BookmarkCheck className="w-4 h-4 mr-2 text-emerald-600" /> Saved — Click to Remove</> : <><Bookmark className="w-4 h-4 mr-2" /> Save to My List</>}
                   </Button>
                 </motion.div>
+
+                <Button
+                  variant="outline"
+                  className="w-full rounded-xl"
+                  onClick={handleGenerateQuiz}
+                  disabled={quizMutation.isPending}
+                >
+                  {quizMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileQuestion className="w-4 h-4 mr-2" />}
+                  {quizMutation.isPending ? "Generating quiz..." : "Generate Module Quiz"}
+                </Button>
               </div>
 
               <div className="border-t border-slate-200 mt-6 pt-6">
@@ -343,6 +418,8 @@ export default function CourseDetail() {
           </motion.div>
         </div>
       </div>
+
+      <ChatBox />
     </div>
   );
 }

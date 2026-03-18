@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
-import { BookOpen, Sparkles, TrendingUp, Clock, Star, ArrowRight, Loader2, Flame, Trophy, BarChart3, Target, Bookmark, ExternalLink, LogOut, Trash2, Zap, RefreshCw } from "lucide-react";
+import { BookOpen, Sparkles, Clock, Star, ArrowRight, Loader2, Trophy, BarChart3, Target, Bookmark, ExternalLink, LogOut, Trash2, Zap, RefreshCw, ThumbsDown, ThumbsUp, Route, Settings, Shield } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { motion, type Variants, type Easing } from "framer-motion";
 import { toast } from "sonner";
@@ -34,6 +34,22 @@ const PLATFORM_COLORS: Record<string, string> = {
   "edX": "bg-red-100 text-red-700", "YouTube": "bg-rose-100 text-rose-700",
 };
 
+function profileArrayCount(raw: string | null | undefined): number {
+  if (!raw) return 0;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.length;
+  } catch {
+    // Fall through to comma parsing.
+  }
+
+  return raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0).length;
+}
+
 export default function Dashboard() {
   const { user, isAuthenticated, logout } = useAuth();
   const [, navigate] = useLocation();
@@ -43,17 +59,54 @@ export default function Dashboard() {
   const utils = trpc.useUtils();
   const bookmarksQuery = trpc.bookmarks.list.useQuery();
   const recommendationsQuery = trpc.recommendations.getForUser.useQuery({ limit: 8 });
+  const feedbackSummaryQuery = trpc.recommendations.feedbackSummary.useQuery();
+  const learningPathQuery = trpc.recommendations.learningPath.useQuery({ steps: 5 });
+  const profileQuery = trpc.profile.get.useQuery();
   const interactionsQuery = trpc.enrollment.getInteractions.useQuery();
   const generateMutation = trpc.recommendations.generate.useMutation();
   const removeBookmarkMutation = trpc.bookmarks.remove.useMutation();
+  const submitFeedbackMutation = trpc.recommendations.submitFeedback.useMutation();
+
+  const isProfileIncomplete = !profileQuery.data ||
+    profileArrayCount(profileQuery.data.skills) === 0 ||
+    profileArrayCount(profileQuery.data.interests) === 0 ||
+    profileArrayCount(profileQuery.data.learningGoals) === 0;
+
+  const memberSince = (() => {
+    if (!user?.createdAt) return "N/A";
+    const parsed = new Date(user.createdAt);
+    if (Number.isNaN(parsed.getTime())) return "N/A";
+    return parsed.toLocaleDateString();
+  })();
 
   const handleGenerateRecommendations = async () => {
     try {
       await generateMutation.mutateAsync({ algorithm: "learning-pattern" });
       await utils.recommendations.getForUser.invalidate();
+      await Promise.all([
+        utils.recommendations.feedbackSummary.invalidate(),
+        utils.recommendations.learningPath.invalidate(),
+      ]);
       toast.success("Recommendations generated! 🎯");
     } catch {
       toast.error("Failed to generate recommendations");
+    }
+  };
+
+  const handleSubmitFeedback = async (
+    recommendationId: number,
+    feedback: "helpful" | "not-helpful"
+  ) => {
+    try {
+      await submitFeedbackMutation.mutateAsync({ recommendationId, feedback });
+      await Promise.all([
+        utils.recommendations.getForUser.invalidate(),
+        utils.recommendations.feedbackSummary.invalidate(),
+        utils.recommendations.learningPath.invalidate(),
+      ]);
+      toast.success(feedback === "helpful" ? "Marked as helpful" : "Thanks for the feedback");
+    } catch {
+      toast.error("Could not save feedback");
     }
   };
 
@@ -87,6 +140,14 @@ export default function Dashboard() {
           </motion.div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => navigate("/courses")} className="font-medium text-slate-100 hover:text-white">Courses</Button>
+            <Button variant="ghost" onClick={() => navigate("/profile")} className="font-medium text-slate-100 hover:text-white">
+              <Settings className="w-4 h-4 mr-1" /> Profile
+            </Button>
+            {user?.role === "admin" && (
+              <Button variant="ghost" onClick={() => navigate("/admin/analytics")} className="font-medium text-slate-100 hover:text-white">
+                <Shield className="w-4 h-4 mr-1" /> Admin
+              </Button>
+            )}
             <Button variant="outline" onClick={async () => { await logout(); navigate("/auth"); }} className="rounded-xl text-red-300 border-red-600/50 hover:bg-red-900/50">
               <LogOut className="w-4 h-4 mr-1" /> Sign Out
             </Button>
@@ -136,6 +197,18 @@ export default function Dashboard() {
           })}
         </motion.div>
 
+        {isProfileIncomplete && (
+          <Card className="mb-8 p-5 border-amber-300/40 bg-amber-100/90 text-amber-900">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-semibold">Complete your onboarding profile for better cold-start recommendations.</p>
+                <p className="text-sm mt-1">Add skills, interests, and learning goals to improve personalization quality.</p>
+              </div>
+              <Button className="rounded-xl bg-amber-600 hover:bg-amber-700 text-white" onClick={() => navigate("/profile")}>Finish Setup</Button>
+            </div>
+          </Card>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-10">
             {/* AI Recommendations */}
@@ -180,6 +253,26 @@ export default function Dashboard() {
                           </span>
                         )}
                         <p className="text-xs text-slate-400 mb-3 line-clamp-2">{rec.reason}</p>
+                        <div className="flex items-center gap-2 mb-3" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className={`rounded-lg border-emerald-500/40 hover:bg-emerald-900/30 ${rec.feedback === "helpful" ? "bg-emerald-900/40 text-emerald-200" : "text-emerald-300"}`}
+                            disabled={!rec.id || submitFeedbackMutation.isPending}
+                            onClick={() => handleSubmitFeedback(rec.id, "helpful")}
+                          >
+                            <ThumbsUp className="w-3 h-3 mr-1" /> Helpful
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className={`rounded-lg border-rose-500/40 hover:bg-rose-900/30 ${rec.feedback === "not-helpful" ? "bg-rose-900/40 text-rose-200" : "text-rose-300"}`}
+                            disabled={!rec.id || submitFeedbackMutation.isPending}
+                            onClick={() => handleSubmitFeedback(rec.id, "not-helpful")}
+                          >
+                            <ThumbsDown className="w-3 h-3 mr-1" /> Not helpful
+                          </Button>
+                        </div>
                         <div className="w-full bg-slate-100 rounded-full h-1.5 mb-4">
                           <motion.div initial={{ width: 0 }} whileInView={{ width: `${Math.min(rec.score, 100)}%` }} viewport={{ once: true }}
                             transition={{ delay: 0.3 + i * 0.1, duration: 0.8 }} className="bg-gradient-to-r from-blue-500 to-indigo-500 h-1.5 rounded-full" />
@@ -285,6 +378,35 @@ export default function Dashboard() {
 
           {/* Sidebar */}
           <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }} className="space-y-6">
+            <Card className="p-6 border-purple-500/30 bg-slate-800/50 backdrop-blur-sm">
+              <h3 className="font-bold text-white mb-3 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-violet-400" /> Feedback Loop
+              </h3>
+              <div className="text-sm text-slate-300 space-y-1">
+                <p>Total feedback: <span className="font-semibold">{feedbackSummaryQuery.data?.total || 0}</span></p>
+                <p>Helpful: <span className="font-semibold text-emerald-300">{feedbackSummaryQuery.data?.helpful || 0}</span></p>
+                <p>Not helpful: <span className="font-semibold text-rose-300">{feedbackSummaryQuery.data?.notHelpful || 0}</span></p>
+              </div>
+            </Card>
+
+            <Card className="p-6 border-purple-500/30 bg-slate-800/50 backdrop-blur-sm">
+              <h3 className="font-bold text-white mb-3 flex items-center gap-2">
+                <Route className="w-5 h-5 text-cyan-400" /> Learning Path
+              </h3>
+              {learningPathQuery.data && learningPathQuery.data.length > 0 ? (
+                <ul className="space-y-2 text-sm text-slate-300">
+                  {learningPathQuery.data.slice(0, 3).map((step: any) => (
+                    <li key={`${step.order}-${step.courseId}`} className="flex items-start gap-2">
+                      <span className="text-cyan-300 font-semibold">{step.order}.</span>
+                      <span>{step.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-slate-400">Generate recommendations to build your learning path.</p>
+              )}
+            </Card>
+
             <Card className="p-6 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 text-white border-0 overflow-hidden relative">
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
               <div className="relative z-10">
@@ -319,7 +441,7 @@ export default function Dashboard() {
               <div className="text-sm text-slate-400 space-y-2">
                 <p><span className="font-semibold">Name:</span> {user?.name}</p>
                 <p><span className="font-semibold">Email:</span> {user?.email}</p>
-                <p><span className="font-semibold">Member since:</span> {new Date(user?.createdAt || "").toLocaleDateString()}</p>
+                <p><span className="font-semibold">Member since:</span> {memberSince}</p>
               </div>
             </Card>
 

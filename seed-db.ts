@@ -10,7 +10,7 @@ import "dotenv/config";
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
-import { createHash } from "crypto";
+import { hashPasswordSync } from "./server/_core/password";
 
 const dbDir = path.resolve(import.meta.dirname, "data");
 if (!fs.existsSync(dbDir)) {
@@ -20,11 +20,6 @@ const dbPath = path.join(dbDir, "elearning.db");
 const db = new Database(dbPath);
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
-
-// Simple password hash (SHA256 - fine for demo)
-function hashPassword(pw: string) {
-    return createHash("sha256").update(pw).digest("hex");
-}
 
 // ─── Drop and recreate tables ────────────────────────────────────────
 db.exec(`
@@ -178,11 +173,11 @@ const insertUser = db.prepare(
 );
 
 const usersData = [
-    ["dev-user", "Dev User", "dev@local.dev", hashPassword("dev123"), "dev", "admin"],
-    ["user-alice", "Alice Johnson", "alice@example.com", hashPassword("alice123"), "email", "user"],
-    ["user-bob", "Bob Martinez", "bob@example.com", hashPassword("bob123"), "email", "user"],
-    ["user-carol", "Carol Williams", "carol@example.com", hashPassword("carol123"), "email", "user"],
-    ["user-dave", "Dave Chen", "dave@example.com", hashPassword("dave123"), "email", "user"],
+    ["dev-user", "Dev User", "dev@local.dev", hashPasswordSync("dev123"), "dev", "admin"],
+    ["user-alice", "Alice Johnson", "alice@example.com", hashPasswordSync("alice123"), "email", "user"],
+    ["user-bob", "Bob Martinez", "bob@example.com", hashPasswordSync("bob123"), "email", "user"],
+    ["user-carol", "Carol Williams", "carol@example.com", hashPasswordSync("carol123"), "email", "user"],
+    ["user-dave", "Dave Chen", "dave@example.com", hashPasswordSync("dave123"), "email", "user"],
 ];
 
 for (const [openId, name, email, pwHash, loginMethod, role] of usersData) {
