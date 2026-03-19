@@ -10,6 +10,7 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
+    "db:init": "tsx init-db.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "seed": "tsx seed-db.ts"
   },

@@ -1,8 +1,8 @@
 import axios from "axios";
 import { ENV } from "./env";
 
-interface AIMessage {
-  role: "user" | "assistant";
+export interface AIMessage {
+  role: "user" | "assistant" | "system";
   content: string;
 }
 
@@ -89,13 +89,20 @@ export class AIService {
     }
 
     try {
+      // Anthropic uses a separate `system` parameter instead of system messages
+      const systemParts = messages.filter(m => m.role === "system").map(m => m.content);
+      const systemPrompt = systemParts.length > 0
+        ? systemParts.join("\n")
+        : "You are an expert educational AI assistant helping users find the perfect online courses. Provide detailed, personalized course recommendations based on their learning goals, skill level, and interests.";
+      const conversationMessages = messages.filter(m => m.role !== "system");
+
       const response = await axios.post(
         "https://api.anthropic.com/v1/messages",
         {
           model: "claude-3-sonnet-20240229",
           max_tokens: 1000,
-          system: "You are an expert educational AI assistant helping users find the perfect online courses. Provide detailed, personalized course recommendations based on their learning goals, skill level, and interests.",
-          messages: messages.map(m => ({
+          system: systemPrompt,
+          messages: conversationMessages.map(m => ({
             role: m.role,
             content: m.content,
           })),
