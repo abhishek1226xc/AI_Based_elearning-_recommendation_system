@@ -107,3 +107,4 @@ temp/
 *.sqlite3
 *.db-shm
 *.db-wal
+dist/

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
-import { BookOpen, Sparkles, TrendingUp, Clock, Star, ArrowRight, Loader2, Flame, Trophy, BarChart3, Target, Bookmark, ExternalLink, LogOut, Trash2, Zap, RefreshCw } from "lucide-react";
+import { BookOpen, Sparkles, TrendingUp, Clock, Star, ArrowRight, Loader2, Flame, Trophy, BarChart3, Target, Bookmark, ExternalLink, LogOut, Trash2, Zap, RefreshCw, User } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { motion, type Variants, type Easing } from "framer-motion";
 import { toast } from "sonner";
@@ -87,6 +87,7 @@ export default function Dashboard() {
           </motion.div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => navigate("/courses")} className="font-medium text-slate-100 hover:text-white">Courses</Button>
+            <Button variant="ghost" onClick={() => navigate("/profile")} className="font-medium text-slate-100 hover:text-white"><User className="w-4 h-4 mr-1" /> Profile</Button>
             <Button variant="outline" onClick={async () => { await logout(); navigate("/auth"); }} className="rounded-xl text-red-300 border-red-600/50 hover:bg-red-900/50">
               <LogOut className="w-4 h-4 mr-1" /> Sign Out
             </Button>
@@ -316,11 +317,14 @@ export default function Dashboard() {
 
             <Card className="p-6 border-purple-500/30 bg-slate-800/50 backdrop-blur-sm">
               <h3 className="font-bold text-white mb-3">Your Profile</h3>
-              <div className="text-sm text-slate-400 space-y-2">
+              <div className="text-sm text-slate-400 space-y-2 mb-4">
                 <p><span className="font-semibold">Name:</span> {user?.name}</p>
                 <p><span className="font-semibold">Email:</span> {user?.email}</p>
                 <p><span className="font-semibold">Member since:</span> {new Date(user?.createdAt || "").toLocaleDateString()}</p>
               </div>
+              <Button variant="outline" className="w-full justify-start rounded-xl border-purple-500/30 text-slate-300 hover:bg-purple-900/50" onClick={() => navigate("/profile")}>
+                <User className="w-4 h-4 mr-2" /> Edit Profile
+              </Button>
             </Card>
 
             {/* Quick Actions */}

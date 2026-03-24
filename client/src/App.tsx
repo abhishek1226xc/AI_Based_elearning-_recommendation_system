@@ -12,6 +12,7 @@ const Courses = lazy(() => import("@/pages/Courses"));
 const CourseDetail = lazy(() => import("@/pages/CourseDetail"));
 const AuthPage = lazy(() => import("@/pages/AuthPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
+const Profile = lazy(() => import("@/pages/Profile"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -29,6 +30,7 @@ function Router() {
         <Route path={"/courses"} component={Courses} />
         <Route path={"/course/:id"} component={CourseDetail} />
         <Route path={"/auth"} component={AuthPage} />
+        <Route path={"/profile"} component={Profile} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
         <Route component={NotFound} />
