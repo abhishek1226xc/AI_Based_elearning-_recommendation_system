@@ -1,0 +1,21 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  typescript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with: { version: 10 }
+      - run: pnpm install
+      - run: pnpm check
+      - run: pnpm lint
+      - run: pnpm test
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install -r python-ml/requirements.txt
+      - run: pytest python-ml/tests/ -v
