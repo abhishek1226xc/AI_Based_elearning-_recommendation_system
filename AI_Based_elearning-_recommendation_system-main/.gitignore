@@ -107,3 +107,10 @@ temp/
 *.sqlite3
 *.db-shm
 *.db-wal
+
+# Python cache and virtual env
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+python-ml/.venv/
