@@ -32,6 +32,7 @@ export const userProfiles = sqliteTable("userProfiles", {
   preferredDifficulty: text("preferredDifficulty").default("intermediate"),
   learningStyle: text("learningStyle"),
   bio: text("bio"),
+  onboardingCompletedAt: integer("onboardingCompletedAt", { mode: "timestamp" }),
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
 });

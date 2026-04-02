@@ -9,11 +9,37 @@ export type MlRecommendation = {
   algorithm: MlAlgorithm;
 };
 
+export type StudyPatternInsights = {
+  userId: number;
+  lookbackDays: number;
+  totalInteractions: number;
+  activeDays: number;
+  consistencyScore: number;
+  avgSessionMinutes: number;
+  completionRate: number;
+  dominantStudyWindow: string;
+  topCategory: string | null;
+  signals: string[];
+};
+
 type RawMlRecommendation = {
   course_id: number;
   score: number;
   reason: string;
   algorithm: string;
+};
+
+type RawStudyPatternInsights = {
+  user_id: number;
+  lookback_days: number;
+  total_interactions: number;
+  active_days: number;
+  consistency_score: number;
+  avg_session_minutes: number;
+  completion_rate: number;
+  dominant_study_window: string;
+  top_category: string | null;
+  signals: string[];
 };
 
 const toMlAlgorithm = (algorithm: string): MlAlgorithm => {
@@ -28,6 +54,19 @@ const normalizeRecommendation = (raw: RawMlRecommendation): MlRecommendation => 
   score: raw.score,
   reason: raw.reason,
   algorithm: toMlAlgorithm(raw.algorithm),
+});
+
+const normalizeStudyPattern = (raw: RawStudyPatternInsights): StudyPatternInsights => ({
+  userId: raw.user_id,
+  lookbackDays: raw.lookback_days,
+  totalInteractions: raw.total_interactions,
+  activeDays: raw.active_days,
+  consistencyScore: raw.consistency_score,
+  avgSessionMinutes: raw.avg_session_minutes,
+  completionRate: raw.completion_rate,
+  dominantStudyWindow: raw.dominant_study_window,
+  topCategory: raw.top_category,
+  signals: raw.signals,
 });
 
 export async function checkMlHealth(): Promise<boolean> {
@@ -79,4 +118,24 @@ export async function sendFeedback(
       feedback_type: feedbackType,
     }),
   });
+}
+
+export async function getStudyPatternInsights(
+  userId: number,
+  lookbackDays = 30
+): Promise<StudyPatternInsights | null> {
+  try {
+    const res = await fetch(`${ML_SERVICE_URL}/study-pattern`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, lookback_days: lookbackDays }),
+    });
+    if (!res.ok) throw new Error("ML study-pattern endpoint error");
+
+    const payload = (await res.json()) as RawStudyPatternInsights;
+    return normalizeStudyPattern(payload);
+  } catch (error) {
+    console.error("Failed to fetch study-pattern insights:", error);
+    return null;
+  }
 }

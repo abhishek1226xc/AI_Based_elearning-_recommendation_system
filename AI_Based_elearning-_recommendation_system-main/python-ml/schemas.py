@@ -21,6 +21,10 @@ class ABTestClickRequest(BaseModel):
     recommendation_id: int
     clicked: bool
 
+class StudyPatternRequest(BaseModel):
+    user_id: int
+    lookback_days: int = 30
+
 # Responses
 class CourseRef(BaseModel):
     course_id: int
@@ -30,3 +34,15 @@ class CourseRef(BaseModel):
 
 class RecommendationResponse(BaseModel):
     recommendations: List[CourseRef]
+
+class StudyPatternResponse(BaseModel):
+    user_id: int
+    lookback_days: int
+    total_interactions: int
+    active_days: int
+    consistency_score: float
+    avg_session_minutes: float
+    completion_rate: float
+    dominant_study_window: str
+    top_category: Optional[str] = None
+    signals: List[str]

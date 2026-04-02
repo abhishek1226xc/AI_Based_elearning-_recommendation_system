@@ -40,12 +40,7 @@ export function useRecommendations(userId: number) {
     }
   );
 
-  const refreshMutation = trpc.recommendations.refresh.useMutation({
-    onSuccess: async () => {
-      await utils.recommendations.getForUser.invalidate({ userId });
-      await utils.recommendations.getStats.invalidate({ userId });
-    },
-  });
+  const refreshMutation = trpc.recommendations.refresh.useMutation();
 
   const feedbackMutation = trpc.recommendations.submitFeedback.useMutation();
 
@@ -68,13 +63,23 @@ export function useRecommendations(userId: number) {
 
   const error = recommendationsQuery.error ?? statsQuery.error ?? null;
 
+  const refresh = async () => {
+    await refreshMutation.mutateAsync({ userId });
+    await Promise.all([
+      utils.recommendations.getForUser.invalidate({ userId }),
+      utils.recommendations.getStats.invalidate({ userId }),
+      recommendationsQuery.refetch(),
+      statsQuery.refetch(),
+    ]);
+  };
+
   return {
     recommendations,
     stats,
     isLoading: recommendationsQuery.isLoading || statsQuery.isLoading,
     isError: recommendationsQuery.isError || statsQuery.isError,
     error,
-    refresh: () => refreshMutation.mutate({ userId }),
+    refresh,
     isRefreshing: refreshMutation.isPending,
     submitFeedback: (recommendationId: number, type: FeedbackType) =>
       feedbackMutation.mutate({ recommendationId, feedback: type }),

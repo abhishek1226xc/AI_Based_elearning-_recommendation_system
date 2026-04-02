@@ -1,9 +1,11 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { trpc } from "@/lib/trpc";
+import { hasCompletedOnboardingInProfile } from "@/lib/onboarding";
 import { useLocation } from "wouter";
-import { BookOpen, Sparkles, TrendingUp, Clock, Star, ArrowRight, Loader2, Flame, Trophy, BarChart3, Target, Bookmark, ExternalLink, LogOut, Trash2, Zap, RefreshCw } from "lucide-react";
+import { BookOpen, Sparkles, TrendingUp, Clock, Star, ArrowRight, Loader2, Flame, Trophy, BarChart3, Target, Bookmark, ExternalLink, LogOut, Trash2, Zap, RefreshCw, PlayCircle, CircleCheckBig } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { motion, type Variants, type Easing } from "framer-motion";
 import { toast } from "sonner";
@@ -35,17 +37,48 @@ const PLATFORM_COLORS: Record<string, string> = {
 };
 
 export default function Dashboard() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, loading } = useAuth();
   const [, navigate] = useLocation();
-
-  if (!isAuthenticated) { navigate("/auth"); return null; }
+  const userId = user?.id ?? 0;
+  const canQueryUserData = isAuthenticated && userId > 0;
 
   const utils = trpc.useUtils();
-  const bookmarksQuery = trpc.bookmarks.list.useQuery();
-  const recommendationsQuery = trpc.recommendations.getForUser.useQuery({ userId: user!.id });
-  const interactionsQuery = trpc.enrollment.getInteractions.useQuery();
+  const profileQuery = trpc.profile.get.useQuery(undefined, {
+    enabled: canQueryUserData,
+  });
+  const enrolledCoursesQuery = trpc.enrollment.enrolledCourses.useQuery(undefined, {
+    enabled: canQueryUserData,
+  });
+
+  const bookmarksQuery = trpc.bookmarks.list.useQuery(undefined, {
+    enabled: canQueryUserData,
+  });
+  const recommendationsQuery = trpc.recommendations.getForUser.useQuery(
+    { userId },
+    { enabled: canQueryUserData }
+  );
+  const interactionsQuery = trpc.enrollment.getInteractions.useQuery(undefined, {
+    enabled: canQueryUserData,
+  });
   const generateMutation = trpc.recommendations.generate.useMutation();
   const removeBookmarkMutation = trpc.bookmarks.remove.useMutation();
+
+  const continueCourse = enrolledCoursesQuery.data?.find((course) => {
+    return course.status === "in-progress" || (course.completionPercentage ?? 0) < 100;
+  }) ?? enrolledCoursesQuery.data?.[0] ?? null;
+
+  const progressPercent = continueCourse?.completionPercentage ?? 0;
+
+  const continueCourseQuery = trpc.courses.getById.useQuery(
+    { id: continueCourse?.courseId ?? 0 },
+    { enabled: Boolean(continueCourse?.courseId) }
+  );
+
+  if (!loading && !isAuthenticated) { navigate("/auth"); return null; }
+  if (loading || profileQuery.isLoading) {
+    return <div className="min-h-screen bg-slate-950 text-slate-300 p-8">Loading your learning profile...</div>;
+  }
+  if (!hasCompletedOnboardingInProfile(profileQuery.data)) { navigate("/onboarding"); return null; }
 
   type RecommendationItem = NonNullable<typeof recommendationsQuery.data>[number];
   type BookmarkItem = NonNullable<typeof bookmarksQuery.data>[number];
@@ -53,7 +86,7 @@ export default function Dashboard() {
   const handleGenerateRecommendations = async () => {
     try {
       await generateMutation.mutateAsync({ algorithm: "hybrid" });
-      await utils.recommendations.getForUser.invalidate({ userId: user!.id });
+      await utils.recommendations.getForUser.invalidate({ userId });
       toast.success("Recommendations generated! 🎯");
     } catch {
       toast.error("Failed to generate recommendations");
@@ -79,8 +112,12 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-950">
-      <motion.nav initial={{ y: -100 }} animate={{ y: 0 }} className="sticky top-0 z-50 glass border-b border-white/20">
+    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(168,85,247,0.18),_transparent_22%),linear-gradient(180deg,_#020617_0%,_#0f172a_55%,_#020617_100%)]">
+      <div className="pointer-events-none absolute inset-0 soft-grid opacity-20" />
+      <div className="pointer-events-none absolute -left-24 top-20 h-80 w-80 rounded-full bg-blue-500/20 blur-3xl" />
+      <div className="pointer-events-none absolute right-0 top-36 h-96 w-96 rounded-full bg-violet-500/15 blur-3xl" />
+
+      <motion.nav initial={{ y: -100 }} animate={{ y: 0 }} className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/70 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <motion.div className="flex items-center gap-2 cursor-pointer" whileHover={{ scale: 1.05 }} onClick={() => navigate("/")}>
             <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
@@ -99,20 +136,36 @@ export default function Dashboard() {
       </motion.nav>
 
       {/* Header */}
-<motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white">
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-    <div className="flex justify-between items-center">
-      <div>
-        <motion.h1 initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="text-3xl font-bold">
-          Welcome, {user?.name}! 👋
-        </motion.h1>
-        <motion.p initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="text-purple-200 mt-1">
-          Your personalized course recommendations
-        </motion.p>
-      </div>
-    </div>       {/* ✅ closes flex div */}
-  </div>         {/* ✅ closes max-w-7xl div */}
-</motion.div>    {/* ✅ closes motion.div */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden border-b border-white/10 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.16),_transparent_28%),linear-gradient(135deg,transparent,rgba(255,255,255,0.08),transparent)]" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <motion.p initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-white/90 backdrop-blur">
+                Personalized dashboard
+              </motion.p>
+              <motion.h1 initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="mt-4 text-3xl font-bold md:text-4xl">
+                Welcome, {user?.name}! 👋
+              </motion.h1>
+              <motion.p initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="mt-2 max-w-2xl text-blue-100">
+                Your personalized course recommendations, saved learning trail, and platform comparisons are ready to explore.
+              </motion.p>
+            </div>
+            <div className="grid grid-cols-3 gap-3 text-center text-sm">
+              {[
+                { label: "Saved", value: bookmarksQuery.data?.length || 0 },
+                { label: "Compared", value: interactionsQuery.data?.length || 0 },
+                { label: "AI picks", value: recommendationsQuery.data?.length || 0 },
+              ].map((chip) => (
+                <div key={chip.label} className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-md">
+                  <p className="text-2xl font-bold text-white">{chip.value}</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-blue-100">{chip.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </motion.div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* Stats */}
@@ -122,14 +175,14 @@ export default function Dashboard() {
             return (
               <motion.div key={i} variants={itemVariants}>
                 <Card
-                  className="p-5 border-purple-500/30 bg-slate-800/50 backdrop-blur-sm card-hover cursor-pointer"
+                  className="surface-card surface-card-hover p-5 cursor-pointer border-white/10 bg-white/10 text-white backdrop-blur-xl"
                   onClick={s.onClick}
                 >
                   <div className="flex items-center gap-3 mb-3">
                     <div className={`w-11 h-11 bg-gradient-to-br ${s.color} rounded-xl flex items-center justify-center shadow-md`}>
                       <Icon className="w-5 h-5 text-white" />
                     </div>
-                    <p className="text-sm text-slate-300 font-medium">{s.label}</p>
+                    <p className="text-sm text-slate-200 font-medium">{s.label}</p>
                   </div>
                   <p className="text-3xl font-bold text-white">
                     {typeof s.value === "number" ? <AnimatedNumber value={s.value} suffix={s.suffix || ""} /> : <>{s.value}{s.suffix}</>}
@@ -139,6 +192,92 @@ export default function Dashboard() {
             );
           })}
         </motion.div>
+
+        <div className="mb-10 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="lg:col-span-2">
+            <Card className="surface-card p-6 md:p-8 bg-white/95">
+              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">Learning momentum</p>
+                  <h2 className="mt-2 text-2xl font-bold text-slate-900">Continue where you left off</h2>
+                  <p className="mt-2 text-slate-600">Pick up the next lesson or revisit your latest in-progress course without digging through the catalog.</p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <div className="mb-2 flex items-center gap-2 text-slate-800">
+                    <CircleCheckBig className="h-4 w-4 text-emerald-600" />
+                    <span>{progressPercent}% complete</span>
+                  </div>
+                  <Progress value={Math.max(0, Math.min(progressPercent, 100))} className="h-2.5 w-44" />
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-gradient-to-r from-slate-50 to-white p-5">
+                {continueCourseQuery.isLoading ? (
+                  <div className="flex items-center gap-3 text-slate-500">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Loading your next course...
+                  </div>
+                ) : continueCourseQuery.data ? (
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="max-w-2xl">
+                      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                        <PlayCircle className="h-4 w-4 text-blue-600" />
+                        Resume course
+                      </div>
+                      <h3 className="text-lg font-semibold text-slate-900">{continueCourseQuery.data.title}</h3>
+                      <p className="mt-1 text-sm text-slate-600 line-clamp-2">{continueCourseQuery.data.description}</p>
+                      <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                        <span>{continueCourseQuery.data.platform}</span>
+                        <span>•</span>
+                        <span>{continueCourseQuery.data.category}</span>
+                        <span>•</span>
+                        <span>{continueCourseQuery.data.difficulty}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <Button onClick={() => navigate(`/course/${continueCourseQuery.data!.id}`)} className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 shadow-lg shadow-blue-500/20">
+                        Continue course <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="font-medium text-slate-900">No active course yet</p>
+                      <p className="text-sm text-slate-600">Explore courses and start one to unlock progress tracking here.</p>
+                    </div>
+                    <Button onClick={() => navigate("/courses")} className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 shadow-lg shadow-blue-500/20">
+                      Browse courses
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <Card className="surface-card p-6 bg-white/95">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">Roadmap snapshot</p>
+              <h2 className="mt-2 text-xl font-bold text-slate-900">Your current progress</h2>
+              <div className="mt-5 space-y-4">
+                <div>
+                  <div className="mb-2 flex items-center justify-between text-sm text-slate-600">
+                    <span>Study progress</span>
+                    <span>{progressPercent}%</span>
+                  </div>
+                  <Progress value={Math.max(0, Math.min(progressPercent, 100))} className="h-2.5" />
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-sm font-medium text-slate-900">Focus for today</p>
+                  <p className="mt-1 text-sm text-slate-600">Complete one focused lesson, then review notes and bookmark one useful resource.</p>
+                </div>
+                <Button variant="outline" className="w-full rounded-2xl" onClick={() => navigate("/recommendations")}>
+                  View your recommendations
+                </Button>
+              </div>
+            </Card>
+          </motion.div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-10">

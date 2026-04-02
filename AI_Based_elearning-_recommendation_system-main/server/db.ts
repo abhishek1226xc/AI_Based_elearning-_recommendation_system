@@ -26,6 +26,24 @@ import {
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
+const isOwnerOpenId = (openId: string | null | undefined): boolean =>
+  Boolean(ENV.ownerOpenId) && openId === ENV.ownerOpenId;
+
+const isOwnerEmail = (email: string | null | undefined): boolean =>
+  Boolean(ENV.ownerEmail) &&
+  typeof email === "string" &&
+  email.toLowerCase() === ENV.ownerEmail.toLowerCase();
+
+const enforceRole = (identity: {
+  openId?: string | null;
+  email?: string | null;
+}): "admin" | "user" => {
+  if (isOwnerOpenId(identity.openId) || isOwnerEmail(identity.email)) {
+    return "admin";
+  }
+  return "user";
+};
+
 let _db: ReturnType<typeof drizzle> | null = null;
 
 /**
@@ -81,11 +99,10 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       if (user.lastSignedIn !== undefined) {
         updateSet.lastSignedIn = user.lastSignedIn;
       }
-      if (user.role !== undefined) {
-        updateSet.role = user.role;
-      } else if (user.openId === ENV.ownerOpenId) {
-        updateSet.role = 'admin';
-      }
+      updateSet.role = enforceRole({
+        openId: user.openId,
+        email: user.email ?? existing[0]?.email,
+      });
 
       if (Object.keys(updateSet).length === 0) {
         updateSet.lastSignedIn = new Date();
@@ -101,7 +118,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
         email: user.email ?? null,
         loginMethod: user.loginMethod ?? null,
         lastSignedIn: user.lastSignedIn ?? new Date(),
-        role: user.role ?? (user.openId === ENV.ownerOpenId ? 'admin' : 'user'),
+        role: enforceRole({ openId: user.openId, email: user.email }),
       };
 
       await db.insert(users).values(values);
@@ -122,6 +139,36 @@ export async function getUserByOpenId(openId: string) {
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
 
   return result.length > 0 ? result[0] : undefined;
+}
+
+export async function normalizeAdminRoles(): Promise<number> {
+  const db = getDb();
+  if (!db) return 0;
+
+  const admins = await db
+    .select({
+      id: users.id,
+      openId: users.openId,
+      email: users.email,
+      role: users.role,
+    })
+    .from(users)
+    .where(eq(users.role, "admin"));
+
+  let demotedCount = 0;
+
+  for (const admin of admins) {
+    const enforced = enforceRole({ openId: admin.openId, email: admin.email });
+    if (enforced !== "admin") {
+      await db
+        .update(users)
+        .set({ role: "user", updatedAt: new Date() })
+        .where(eq(users.id, admin.id));
+      demotedCount += 1;
+    }
+  }
+
+  return demotedCount;
 }
 
 // Course queries
@@ -367,7 +414,7 @@ export async function createUser(data: { email: string; name: string; passwordHa
     email: data.email,
     passwordHash: data.passwordHash,
     loginMethod: "email",
-    role: "user",
+    role: enforceRole({ openId, email: data.email }),
     lastSignedIn: new Date(),
   });
   return getUserByOpenId(openId);

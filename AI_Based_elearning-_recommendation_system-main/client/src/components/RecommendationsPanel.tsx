@@ -49,16 +49,20 @@ export function RecommendationsPanel({ userId }: Props) {
     : "n/a";
 
   return (
-    <section className="space-y-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Recommended for You</h1>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{algorithmLabel}</Badge>
-            <Badge className="bg-blue-100 text-blue-700">avgScore {avgScoreLabel}</Badge>
+    <section className="space-y-6 rounded-[2rem] border border-slate-200/80 bg-white/75 p-5 shadow-[0_24px_70px_-42px_rgba(15,23,42,0.35)] backdrop-blur-sm dark:border-white/10 dark:bg-slate-950/65">
+      <header className="relative overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 p-6 text-white shadow-lg shadow-blue-500/15 dark:border-white/10">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.16),_transparent_28%),linear-gradient(135deg,transparent,rgba(255,255,255,0.08),transparent)]" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-100">Adaptive recommendations</p>
+            <h1 className="mt-2 text-2xl font-semibold text-white md:text-3xl">Recommended for You</h1>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Badge className="border border-white/20 bg-white/10 text-white">{algorithmLabel}</Badge>
+              <Badge className="border border-white/20 bg-white/10 text-white">avgScore {avgScoreLabel}</Badge>
+              <Badge className="border border-white/20 bg-white/10 text-white">Top category {stats?.topCategory ?? "n/a"}</Badge>
+            </div>
           </div>
-        </div>
-        <Button onClick={refresh} disabled={isRefreshing}>
+          <Button onClick={refresh} disabled={isRefreshing} className="rounded-2xl bg-white text-indigo-700 shadow-lg shadow-indigo-950/10 hover:bg-blue-50">
           {isRefreshing ? (
             <>
               <RefreshCw className="h-4 w-4 animate-spin" />
@@ -70,7 +74,8 @@ export function RecommendationsPanel({ userId }: Props) {
               Refresh
             </>
           )}
-        </Button>
+          </Button>
+        </div>
       </header>
 
       {isLoading ? (
@@ -94,7 +99,7 @@ export function RecommendationsPanel({ userId }: Props) {
       ) : null}
 
       {!isLoading && !isError && recommendations.length === 0 ? (
-        <div className="rounded-xl border border-dashed p-10 text-center">
+        <div className="rounded-3xl border border-dashed border-slate-200 bg-white/60 p-10 text-center dark:border-white/10 dark:bg-slate-900/40">
           <BookOpen className="mx-auto mb-3 h-10 w-10 text-slate-400" />
           <h2 className="text-lg font-medium text-slate-800">No recommendations yet.</h2>
           <p className="text-slate-500">
@@ -121,7 +126,7 @@ export function RecommendationsPanel({ userId }: Props) {
         </div>
       ) : null}
 
-      <footer className="text-sm text-slate-500">
+      <footer className="text-sm text-slate-500 dark:text-slate-400">
         Showing {recommendations.length} courses · Top category: {stats?.topCategory ?? "n/a"} · Expires: {expiresLabel}
       </footer>
     </section>

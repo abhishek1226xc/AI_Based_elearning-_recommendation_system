@@ -56,6 +56,105 @@ export type RecommendationRow = {
 const RECOMMENDATION_LIMIT = 12;
 const RECOMMENDATION_TTL_SECONDS = 24 * 60 * 60;
 
+export type RecommendationRefreshStatus = {
+  shouldRefresh: boolean;
+  refreshReason:
+    | "missing_cache"
+    | "expired_cache"
+    | "source_data_updated"
+    | "up_to_date";
+  latestGeneratedAt: number;
+  latestExpiresAt: number;
+  latestSourceUpdate: number;
+};
+
+const getRecommendationRefreshStatusInternal = (
+  userId: number
+): RecommendationRefreshStatus => {
+  const meta = db
+    .prepare(
+      `SELECT
+          COUNT(*) AS total,
+          COALESCE(MAX(generatedAt), 0) AS latestGeneratedAt,
+          COALESCE(MAX(expiresAt), 0) AS latestExpiresAt
+       FROM recommendations
+       WHERE userId = ?`
+    )
+    .get(userId) as {
+    total: number;
+    latestGeneratedAt: number;
+    latestExpiresAt: number;
+  };
+
+  if (!meta || meta.total === 0) {
+    return {
+      shouldRefresh: true,
+      refreshReason: "missing_cache",
+      latestGeneratedAt: 0,
+      latestExpiresAt: 0,
+      latestSourceUpdate: 0,
+    };
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  if (meta.latestExpiresAt <= now) {
+    return {
+      shouldRefresh: true,
+      refreshReason: "expired_cache",
+      latestGeneratedAt: meta.latestGeneratedAt,
+      latestExpiresAt: meta.latestExpiresAt,
+      latestSourceUpdate: 0,
+    };
+  }
+
+  const source = db
+    .prepare(
+      `SELECT
+          COALESCE((SELECT MAX(updatedAt) FROM courses), 0) AS latestCourseUpdate,
+          COALESCE((SELECT MAX(updatedAt) FROM userProfiles WHERE userId = ?), 0) AS latestProfileUpdate,
+          COALESCE((SELECT MAX(timestamp) FROM courseInteractions WHERE userId = ?), 0) AS latestInteractionUpdate`
+    )
+    .get(userId, userId) as {
+    latestCourseUpdate: number;
+    latestProfileUpdate: number;
+    latestInteractionUpdate: number;
+  };
+
+  const latestSourceUpdate = Math.max(
+    source?.latestCourseUpdate ?? 0,
+    source?.latestProfileUpdate ?? 0,
+    source?.latestInteractionUpdate ?? 0
+  );
+
+  if (latestSourceUpdate > meta.latestGeneratedAt) {
+    return {
+      shouldRefresh: true,
+      refreshReason: "source_data_updated",
+      latestGeneratedAt: meta.latestGeneratedAt,
+      latestExpiresAt: meta.latestExpiresAt,
+      latestSourceUpdate,
+    };
+  }
+
+  return {
+    shouldRefresh: false,
+    refreshReason: "up_to_date",
+    latestGeneratedAt: meta.latestGeneratedAt,
+    latestExpiresAt: meta.latestExpiresAt,
+    latestSourceUpdate,
+  };
+};
+
+export const getRecommendationRefreshStatus = (
+  userId: number
+): RecommendationRefreshStatus => {
+  return getRecommendationRefreshStatusInternal(userId);
+};
+
+const shouldRefreshRecommendations = (userId: number): boolean => {
+  return getRecommendationRefreshStatusInternal(userId).shouldRefresh;
+};
+
 const parseJsonStringArray = (value: string | null | undefined): string[] => {
   if (!value) return [];
   try {
@@ -91,6 +190,14 @@ const normalizedDifficultyScore = (
 const normalize = (value: number, max: number): number => {
   if (max <= 0) return 0;
   return Math.max(0, Math.min(1, value / max));
+};
+
+// Stable pseudo-random value in [0, 1) for controlled ranking diversity.
+const seededUnitRandom = (userId: number, courseId: number, seed: number): number => {
+  let x = (userId * 73856093) ^ (courseId * 19349663) ^ (seed * 83492791);
+  x = (x ^ (x >>> 13)) >>> 0;
+  x = Math.imul(x, 1274126177) >>> 0;
+  return (x & 0x7fffffff) / 0x80000000;
 };
 
 const getUserIds = (userId?: number): number[] => {
@@ -213,6 +320,8 @@ const buildRecommendationsForUser = (userId: number): RecommendationInsert[] => 
     ...parseJsonStringArray(profile?.interests ?? null),
   ].map((value) => value.toLowerCase()));
 
+  const generationSeed = Math.floor(Date.now() / 10);
+
   const scored = courses
     .filter((course) => !interactedCourseIds.has(course.id))
     .map((course) => {
@@ -237,13 +346,17 @@ const buildRecommendationsForUser = (userId: number): RecommendationInsert[] => 
         ? 0.35 * contentScore + 0.25 * collaborativeScore + 0.2 * popularityScore + 0.1 * ratingScore + 0.1 * difficultyScore
         : 0.65 * popularityScore + 0.35 * ratingScore;
 
+      // Add small exploration jitter so manual refresh can rotate similarly scored courses.
+      const jitter = (seededUnitRandom(userId, course.id, generationSeed) - 0.5) * 0.1;
+      const diversifiedScore = Math.max(0, Math.min(1, finalScore + jitter));
+
       const reason = hasBehaviorData
         ? `Matched your interests in ${course.category}`
         : `Popular course in ${course.category}`;
 
       return {
         courseId: course.id,
-        score: Math.round(Math.max(0, Math.min(1, finalScore)) * 100),
+        score: Math.round(diversifiedScore * 100),
         reason,
         algorithm,
       };
@@ -276,6 +389,11 @@ export async function generateRecommendations(userId?: number): Promise<void> {
 export async function getRecommendationsForUser(
   userId: number
 ): Promise<RecommendationRow[]> {
+  if (shouldRefreshRecommendations(userId)) {
+    const recommendations = buildRecommendationsForUser(userId);
+    upsertRecommendations(recommendations);
+  }
+
   const rows = db
     .prepare(
       `SELECT

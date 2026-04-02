@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation, useRoute } from "wouter";
-import { ArrowLeft, BookOpen, Clock, Star, Users, Sparkles, Loader2, ExternalLink, Award, Bookmark, BookmarkCheck, Globe } from "lucide-react";
+import { ArrowLeft, BookOpen, Clock, Star, Users, Sparkles, Loader2, ExternalLink, Award, Bookmark, BookmarkCheck, Globe, PlayCircle, Route, CircleCheckBig, RotateCcw } from "lucide-react";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -19,6 +20,61 @@ const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, trans
 const itemVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5 } } };
 const tagVariants = { hidden: { opacity: 0, scale: 0 }, visible: { opacity: 1, scale: 1, transition: { duration: 0.3 } } };
 
+function DetailSkeleton() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        <Card className="mb-8 p-8 border-slate-200/80 bg-white/70 backdrop-blur-sm">
+          <div className="h-5 w-32 rounded bg-slate-200 animate-pulse mb-4" />
+          <div className="h-10 w-2/3 rounded bg-slate-200 animate-pulse mb-3" />
+          <div className="h-5 w-1/3 rounded bg-slate-200 animate-pulse" />
+        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-8">
+            <Card className="p-6 border-slate-200/80 bg-white/70 backdrop-blur-sm">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="text-center">
+                    <div className="mx-auto mb-2 h-6 w-6 rounded bg-slate-200 animate-pulse" />
+                    <div className="mx-auto mb-2 h-3 w-14 rounded bg-slate-200 animate-pulse" />
+                    <div className="mx-auto h-6 w-12 rounded bg-slate-200 animate-pulse" />
+                  </div>
+                ))}
+              </div>
+            </Card>
+            <Card className="p-8 border-slate-200/80 bg-white/70 backdrop-blur-sm">
+              <div className="h-7 w-48 rounded bg-slate-200 animate-pulse mb-4" />
+              <div className="space-y-3">
+                <div className="h-4 w-full rounded bg-slate-200 animate-pulse" />
+                <div className="h-4 w-11/12 rounded bg-slate-200 animate-pulse" />
+                <div className="h-4 w-10/12 rounded bg-slate-200 animate-pulse" />
+              </div>
+            </Card>
+            <Card className="p-8 border-slate-200/80 bg-white/70 backdrop-blur-sm">
+              <div className="h-7 w-56 rounded bg-slate-200 animate-pulse mb-4" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="h-28 rounded-xl bg-slate-200 animate-pulse" />
+                ))}
+              </div>
+            </Card>
+          </div>
+          <div className="lg:col-span-1">
+            <Card className="p-8 sticky top-28 border-slate-200/80 bg-white/70 backdrop-blur-sm">
+              <div className="h-6 w-40 rounded bg-slate-200 animate-pulse mb-4" />
+              <div className="space-y-3">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div key={index} className="h-4 w-full rounded bg-slate-200 animate-pulse" />
+                ))}
+              </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CourseDetail() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/course/:id");
@@ -30,9 +86,21 @@ export default function CourseDetail() {
 
   const utils = trpc.useUtils();
   const courseQuery = trpc.courses.getById.useQuery({ id: courseId });
-  const platformRatingsQuery = trpc.courses.platformRatings.useQuery({ courseId });
-  const relatedQuery = trpc.recommendations.relatedCourses.useQuery({ courseId, limit: 5 });
-  const aiSuggestionsQuery = trpc.recommendations.aiSuggestions.useQuery({ courseId, limit: 6 }, { enabled: isAuthenticated });
+  const platformRatingsQuery = trpc.courses.platformRatings.useQuery(
+    { courseId },
+    { enabled: Boolean(courseId) }
+  );
+  const relatedQuery = trpc.recommendations.relatedCourses.useQuery(
+    { courseId, limit: 5 },
+    { enabled: Boolean(courseId) }
+  );
+  const aiSuggestionsQuery = trpc.recommendations.aiSuggestions.useQuery(
+    { courseId, limit: 6 },
+    { enabled: isAuthenticated && Boolean(courseId) }
+  );
+  const interactionsQuery = trpc.enrollment.getInteractions.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
   const bookmarksQuery = trpc.bookmarks.list.useQuery(undefined, { enabled: isAuthenticated });
   const bookmarkAddMutation = trpc.bookmarks.add.useMutation();
   const bookmarkRemoveMutation = trpc.bookmarks.remove.useMutation();
@@ -41,6 +109,7 @@ export default function CourseDetail() {
   type BookmarkItem = NonNullable<typeof bookmarksQuery.data>[number];
   type PlatformRatingItem = NonNullable<typeof platformRatingsQuery.data>[number];
   type RelatedCourseItem = NonNullable<typeof relatedQuery.data>[number];
+  type AISuggestionItem = NonNullable<typeof aiSuggestionsQuery.data>[number];
 
   // Check if already bookmarked
   useEffect(() => {
@@ -103,9 +172,109 @@ export default function CourseDetail() {
   const course = courseQuery.data;
   const tags = course.tags ? JSON.parse(course.tags) : [];
   const platformRatings = platformRatingsQuery.data || [];
+  const isRecommendationLoading = relatedQuery.isLoading || aiSuggestionsQuery.isLoading;
+  const aiSuggestions = Array.isArray(aiSuggestionsQuery.data) ? aiSuggestionsQuery.data : [];
+  const thisCourseProgress = interactionsQuery.data
+    ?.filter((interaction) => interaction.courseId === courseId)
+    .reduce((max, interaction) => {
+      if (interaction.interactionType === "completed") return 100;
+      return Math.max(max, interaction.completionPercentage ?? 0, interaction.interactionType === "started" ? 5 : 0);
+    }, 0) ?? 0;
+
+  const roadmapSteps = [
+    {
+      label: `Start with fundamentals of ${course.category}`,
+      target: 25,
+      type: "started" as const,
+    },
+    {
+      label: `Practice with instructor-led exercises by ${course.instructor || "the instructor"}`,
+      target: 50,
+      type: "started" as const,
+    },
+    {
+      label: "Complete mini projects and checkpoint quizzes",
+      target: 75,
+      type: "started" as const,
+    },
+    {
+      label: "Revise and finish the final module",
+      target: 100,
+      type: "completed" as const,
+    },
+  ];
+
+  const nextStep = roadmapSteps.find((step) => thisCourseProgress < step.target) ?? null;
+  const completedStepIndex = roadmapSteps.findLastIndex((step) => thisCourseProgress >= step.target);
+  const undoTarget = completedStepIndex <= 0 ? 0 : roadmapSteps[completedStepIndex - 1].target;
+
+  const markNextCheckpoint = async () => {
+    if (!isAuthenticated) {
+      navigate("/auth");
+      return;
+    }
+    if (!nextStep) {
+      toast.success("You already completed all checkpoints for this course.");
+      return;
+    }
+
+    try {
+      await recordInteraction.mutateAsync({
+        courseId,
+        interactionType: nextStep.type,
+        completionPercentage: nextStep.target,
+        timeSpent: 20 * 60,
+      });
+
+      await Promise.all([
+        interactionsQuery.refetch(),
+        utils.enrollment.getInteractions.invalidate(),
+        utils.enrollment.enrolledCourses.invalidate(),
+        utils.recommendations.getForUser.invalidate(),
+      ]);
+      const doneLabel = nextStep.type === "completed" ? "Course completed" : `Checkpoint ${nextStep.target}% completed`;
+      toast.success(doneLabel);
+    } catch {
+      toast.error("Failed to update checkpoint progress");
+    }
+  };
+
+  const undoLastCheckpoint = async () => {
+    if (!isAuthenticated) {
+      navigate("/auth");
+      return;
+    }
+    if (thisCourseProgress <= 0) {
+      toast.info("No completed checkpoint to undo.");
+      return;
+    }
+
+    try {
+      await recordInteraction.mutateAsync({
+        courseId,
+        interactionType: undoTarget > 0 ? "started" : "viewed",
+        completionPercentage: undoTarget,
+        timeSpent: 5 * 60,
+      });
+
+      await Promise.all([
+        interactionsQuery.refetch(),
+        utils.enrollment.getInteractions.invalidate(),
+        utils.enrollment.enrolledCourses.invalidate(),
+        utils.recommendations.getForUser.invalidate(),
+      ]);
+      toast.success(`Progress reverted to ${undoTarget}%`);
+    } catch {
+      toast.error("Failed to undo checkpoint progress");
+    }
+  };
+
+  if (courseQuery.isFetching && !courseQuery.data) {
+    return <DetailSkeleton />;
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div key={courseId ?? "course-detail"} className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Nav */}
       <motion.nav initial={{ y: -100 }} animate={{ y: 0 }} className="sticky top-0 z-50 glass border-b border-white/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
@@ -189,6 +358,96 @@ export default function CourseDetail() {
               </Card>
             </motion.div>
 
+            <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+              <Card className="mb-8 overflow-hidden border-slate-200/80 bg-white/80 backdrop-blur-sm">
+                <div className="border-b border-slate-200 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 p-6 text-white">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-100">Learning flow</p>
+                  <h2 className="mt-2 text-2xl font-bold">Course roadmap in flow format</h2>
+                  <p className="mt-2 text-blue-100">Follow this path to complete the course in a smooth sequence.</p>
+                </div>
+
+                <div className="p-6">
+                  <div className="mb-5 flex items-center justify-between rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-blue-700">
+                      <PlayCircle className="h-4 w-4" /> Progress in this course
+                    </div>
+                    <span className="text-sm font-bold text-blue-700">{thisCourseProgress}%</span>
+                  </div>
+                  <Progress value={thisCourseProgress} className="mb-6 h-2.5" />
+
+                  <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">Mark next checkpoint</p>
+                      <p className="text-sm text-slate-600">
+                        {nextStep ? `Next target: ${nextStep.target}%` : "All checkpoints completed"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        onClick={markNextCheckpoint}
+                        disabled={recordInteraction.isPending || !nextStep}
+                        className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 shadow-lg shadow-blue-500/20"
+                      >
+                        {recordInteraction.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating...
+                          </>
+                        ) : (
+                          <>
+                            <CircleCheckBig className="mr-2 h-4 w-4" />
+                            {nextStep ? "Complete next checkpoint" : "Completed"}
+                          </>
+                        )}
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        onClick={undoLastCheckpoint}
+                        disabled={recordInteraction.isPending || thisCourseProgress <= 0}
+                        className="rounded-2xl"
+                      >
+                        <RotateCcw className="mr-2 h-4 w-4" /> Undo last checkpoint
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <div className="absolute left-5 top-8 bottom-8 w-px bg-gradient-to-b from-blue-400 via-indigo-400 to-emerald-400 opacity-60" />
+                    <div className="space-y-4">
+                      {roadmapSteps.map((step, index) => (
+                        <motion.div
+                          key={step.label}
+                          initial={{ opacity: 0, y: 12 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true }}
+                          transition={{ delay: index * 0.07 }}
+                          className="relative flex items-start gap-4 pl-2"
+                        >
+                          <div className={`relative z-10 flex h-10 w-10 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-lg ${
+                            thisCourseProgress >= step.target
+                              ? "bg-gradient-to-br from-emerald-500 to-teal-500 shadow-emerald-200/80"
+                              : "bg-gradient-to-br from-blue-500 to-indigo-500 shadow-blue-200/70"
+                          }`}>
+                            {index + 1}
+                          </div>
+                          <div className={`flex-1 rounded-2xl border p-4 ${
+                            thisCourseProgress >= step.target
+                              ? "border-emerald-200 bg-emerald-50"
+                              : "border-slate-200 bg-slate-50"
+                          }`}>
+                            <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                              <Route className="h-3.5 w-3.5 text-blue-600" /> Flow step
+                            </div>
+                            <p className="text-sm font-medium text-slate-800">{step.label}</p>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
+
             {/* Cross-Platform Comparison */}
             {platformRatings.length > 0 && (
               <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
@@ -265,7 +524,20 @@ export default function CourseDetail() {
             )}
 
             {/* Related */}
-            {relatedQuery.data && relatedQuery.data.length > 0 && (
+            {(relatedQuery.isLoading || isRecommendationLoading) && !relatedQuery.data?.length ? (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-8">
+                <h2 className="text-2xl font-bold text-slate-900 mb-6">Related Courses</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <Card key={index} className="p-5 border-slate-200/80 bg-white/70 card-hover">
+                      <div className="h-5 w-4/5 rounded bg-slate-200 animate-pulse mb-3" />
+                      <div className="h-4 w-2/3 rounded bg-slate-200 animate-pulse mb-4" />
+                      <div className="h-9 w-full rounded-xl bg-slate-200 animate-pulse" />
+                    </Card>
+                  ))}
+                </div>
+              </motion.div>
+            ) : relatedQuery.data && relatedQuery.data.length > 0 ? (
               <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
                 <h2 className="text-2xl font-bold text-slate-900 mb-6">Related Courses</h2>
                 <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
@@ -282,12 +554,53 @@ export default function CourseDetail() {
                   ))}
                 </motion.div>
               </motion.div>
-            )}
+            ) : null}
+
+            {/* AI Suggestions */}
+            {aiSuggestionsQuery.isLoading && aiSuggestions.length === 0 ? (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-8">
+                <h2 className="text-2xl font-bold text-slate-900 mb-6">AI Suggestions</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <Card key={index} className="p-5 border-slate-200/80 bg-white/70 card-hover">
+                      <div className="h-5 w-4/5 rounded bg-slate-200 animate-pulse mb-3" />
+                      <div className="h-4 w-2/3 rounded bg-slate-200 animate-pulse mb-4" />
+                      <div className="h-9 w-full rounded-xl bg-slate-200 animate-pulse" />
+                    </Card>
+                  ))}
+                </div>
+              </motion.div>
+            ) : aiSuggestions.length > 0 ? (
+              <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+                <h2 className="text-2xl font-bold text-slate-900 mb-6">AI Suggestions</h2>
+                <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+                  {aiSuggestions.map((suggestion: AISuggestionItem) => (
+                    <motion.div key={suggestion.courseId} variants={itemVariants}>
+                      <Card className="p-5 border-slate-200/80 bg-white/70 card-hover cursor-pointer group" onClick={() => navigate(`/course/${suggestion.courseId}`)}>
+                        <h3 className="font-semibold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">{suggestion.reason}</h3>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold text-indigo-600">{Math.round(suggestion.score * 100)}% match</span>
+                          <Button size="sm" variant="ghost" className="text-blue-600">View <ExternalLink className="w-3 h-3 ml-1" /></Button>
+                        </div>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </motion.div>
+            ) : null}
           </div>
 
           {/* Sidebar */}
           <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="lg:col-span-1">
             <Card className="p-8 sticky top-28 border-slate-200/80 bg-white/70 backdrop-blur-sm">
+              <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50/80 p-4">
+                <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
+                  <span>Current progress</span>
+                  <span>{thisCourseProgress}%</span>
+                </div>
+                <Progress value={thisCourseProgress} className="h-2" />
+              </div>
+
               <h3 className="text-lg font-bold text-slate-900 mb-4">Course Details</h3>
               <div className="space-y-3 text-sm text-slate-600 mb-6">
                 <p><span className="font-semibold text-slate-900">Platform:</span> {course.platform}</p>

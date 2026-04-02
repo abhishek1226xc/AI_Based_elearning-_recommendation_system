@@ -9,6 +9,7 @@ import { appRouter } from "./appRouter";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { db } from "./db";
+import { normalizeAdminRoles } from "../db";
 import {
   generateRecommendations,
   getRecommendationsForUser,
@@ -35,6 +36,11 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  const demotedAdmins = await normalizeAdminRoles();
+  if (demotedAdmins > 0) {
+    console.warn(`[Auth] Demoted ${demotedAdmins} non-owner admin account(s) to user.`);
+  }
+
   const app = express();
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads

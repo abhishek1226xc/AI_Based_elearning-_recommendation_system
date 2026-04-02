@@ -7,9 +7,11 @@ echo.
 
 set "APP_DIR=%~dp0AI_Based_elearning-_recommendation_system-main"
 set "PYTHON_ML_DIR=%APP_DIR%\python-ml"
+set "PYTHON_REQ_FILE=%PYTHON_ML_DIR%\requirements.txt"
 set "ML_START_SCRIPT=%~dp0start-ml.ps1"
 set "ML_PORT=8010"
 set "ML_URL=http://127.0.0.1:%ML_PORT%"
+set "DB_FILE=%APP_DIR%\data\elearning.db"
 
 if not exist "%APP_DIR%\package.json" (
 	echo [ERROR] Project package.json not found in "%APP_DIR%"
@@ -21,10 +23,58 @@ if not exist "%PYTHON_ML_DIR%\main.py" (
 	exit /b 1
 )
 
+if not exist "%PYTHON_REQ_FILE%" (
+	echo [ERROR] Python requirements.txt not found in "%PYTHON_ML_DIR%"
+	exit /b 1
+)
+
 if not exist "%ML_START_SCRIPT%" (
 	echo [ERROR] ML launcher script not found at "%ML_START_SCRIPT%"
 	exit /b 1
 )
+
+where npm >nul 2>nul
+if errorlevel 1 (
+	echo [ERROR] npm is not installed or not in PATH.
+	exit /b 1
+)
+
+where python >nul 2>nul
+if errorlevel 1 (
+	echo [ERROR] Python is not installed or not in PATH.
+	exit /b 1
+)
+
+pushd "%APP_DIR%"
+
+if not exist "%APP_DIR%\node_modules" (
+	echo [INFO] Installing Node dependencies ^(first run^)...
+	npm install
+	if errorlevel 1 (
+		echo [ERROR] Failed to install Node dependencies.
+		popd
+		exit /b 1
+	)
+)
+
+if not exist "%DB_FILE%" (
+	echo [INFO] Initializing database ^(first run^)...
+	npm run db:init
+	if errorlevel 1 (
+		echo [ERROR] Failed to initialize database.
+		popd
+		exit /b 1
+	)
+	echo [INFO] Seeding database ^(first run^)...
+	npm run seed
+	if errorlevel 1 (
+		echo [ERROR] Failed to seed database.
+		popd
+		exit /b 1
+	)
+)
+
+popd
 
 netstat -ano | findstr ":%ML_PORT%" >nul
 if errorlevel 1 (

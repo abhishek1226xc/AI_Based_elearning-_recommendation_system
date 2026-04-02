@@ -56,15 +56,15 @@ export function RecommendationCard({ item, onFeedback, recommendationId }: Props
   const hiddenTagCount = Math.max(item.tags.length - visibleTags.length, 0);
 
   return (
-    <Card className="group relative overflow-hidden border-slate-200 transition-shadow duration-200 hover:shadow-lg">
+    <Card className="group relative overflow-hidden border-slate-200/80 bg-white/80 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-white/10 dark:bg-slate-900/75">
       <div className="absolute top-3 left-3 z-10">
-        <Badge className="bg-slate-900 text-white">#{item.rank}</Badge>
+        <Badge className="bg-slate-950/90 text-white shadow-lg shadow-slate-950/10">#{item.rank}</Badge>
       </div>
 
       <CardHeader className="pt-10 pb-2">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-base font-semibold leading-snug text-slate-900">{item.title}</h3>
-          <Badge className={`${scoreClasses(item.score)} border-0`}>
+          <h3 className="text-base font-semibold leading-snug text-slate-900 dark:text-white">{item.title}</h3>
+          <Badge className={`${scoreClasses(item.score)} border-0 shadow-sm`}>
             {item.score}
           </Badge>
         </div>
@@ -79,7 +79,7 @@ export function RecommendationCard({ item, onFeedback, recommendationId }: Props
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-3 text-sm text-slate-600">
+      <CardContent className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
         <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
           <div className="flex items-center gap-1">
             <Clock className="h-3.5 w-3.5" />
@@ -99,7 +99,7 @@ export function RecommendationCard({ item, onFeedback, recommendationId }: Props
           </div>
         </div>
 
-        <p className="italic text-slate-500">{item.reason}</p>
+        <p className="italic text-slate-500 dark:text-slate-400">{item.reason}</p>
 
         <div className="flex flex-wrap gap-1">
           {visibleTags.map((tag) => (
@@ -114,7 +114,7 @@ export function RecommendationCard({ item, onFeedback, recommendationId }: Props
           ) : null}
         </div>
 
-        <p className="text-xs text-slate-500">Instructor: {item.instructor ?? "Unknown"}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Instructor: {item.instructor ?? "Unknown"}</p>
 
         <div className="flex items-center justify-between gap-2 pt-1">
           <div className="flex items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
@@ -164,7 +164,7 @@ export function RecommendationCard({ item, onFeedback, recommendationId }: Props
           <Button
             asChild
             size="sm"
-            className="ml-auto"
+            className="ml-auto rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 shadow-lg shadow-blue-500/15"
             disabled={!item.platformUrl}
           >
             <a href={item.platformUrl ?? "#"} target="_blank" rel="noreferrer noopener">

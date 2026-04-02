@@ -48,6 +48,7 @@ const schema = `
     preferredDifficulty TEXT DEFAULT 'intermediate',
     learningStyle TEXT,
     bio TEXT,
+    onboardingCompletedAt INTEGER,
     createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
     updatedAt INTEGER NOT NULL DEFAULT (unixepoch()),
     FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE

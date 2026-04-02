@@ -271,6 +271,10 @@ class SDKServer {
         const user = await db.getUserByOpenId(session.openId);
         if (user) {
           await db.upsertUser({ openId: user.openId, lastSignedIn: new Date() });
+          const refreshedUser = await db.getUserByOpenId(session.openId);
+          if (refreshedUser) {
+            return refreshedUser;
+          }
           return user;
         }
       }
@@ -286,7 +290,7 @@ class SDKServer {
           name: "Dev User",
           email: "dev@local.dev",
           loginMethod: "dev",
-          role: "admin",
+          role: ENV.ownerOpenId === devOpenId ? "admin" : "user",
           lastSignedIn: new Date(),
         });
         devUser = await db.getUserByOpenId(devOpenId);

@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
-from routers import health, recommend, train, embeddings, ab_test
+from routers import health, recommend, train, embeddings, ab_test, study_pattern
 
 load_dotenv()
 
@@ -26,6 +26,7 @@ app.include_router(recommend.router)
 app.include_router(train.router)
 app.include_router(embeddings.router)
 app.include_router(ab_test.router)
+app.include_router(study_pattern.router)
 
 if __name__ == "__main__":
     port = int(os.getenv("ML_PORT", "8000"))

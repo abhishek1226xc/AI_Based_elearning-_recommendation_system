@@ -1,13 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
-import { Search, Clock, Star, Users, ArrowLeft, BookOpen, X, ExternalLink, Globe, Bookmark, BookmarkCheck, Sparkles } from "lucide-react";
+import { Search, Clock, Star, Users, ArrowLeft, BookOpen, X, ExternalLink, Globe, Bookmark, BookmarkCheck, Sparkles, PlayCircle, Route, RefreshCw } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ChatBox } from "@/components/ChatBox";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
@@ -55,9 +56,15 @@ export default function Courses() {
   const [sortBy, setSortBy] = useState<"rating" | "reviews" | "learners">("rating");
 
   const utils = trpc.useUtils();
-  const coursesQuery = trpc.courses.list.useQuery({ limit: 100 });
-  const categoriesQuery = trpc.courses.categories.useQuery();
+  const coursesQuery = trpc.courses.list.useQuery(
+    { limit: 100 },
+    { refetchOnWindowFocus: true, refetchInterval: 30000 }
+  );
+  const categoriesQuery = trpc.courses.categories.useQuery(undefined, {
+    refetchOnWindowFocus: true,
+  });
   const bookmarksQuery = trpc.bookmarks.list.useQuery(undefined, { enabled: isAuthenticated });
+  const interactionsQuery = trpc.enrollment.getInteractions.useQuery(undefined, { enabled: isAuthenticated });
   const addBookmark = trpc.bookmarks.add.useMutation();
   const removeBookmark = trpc.bookmarks.remove.useMutation();
 
@@ -104,6 +111,52 @@ export default function Courses() {
 
   const activeFilters = [searchQuery, selectedCategory, selectedDifficulty].filter(Boolean).length;
 
+  useEffect(() => {
+    const refreshTimer = setInterval(() => {
+      coursesQuery.refetch();
+    }, 30000);
+
+    return () => clearInterval(refreshTimer);
+  }, [coursesQuery]);
+
+  const handleRefreshCourses = async () => {
+    await Promise.all([
+      coursesQuery.refetch(),
+      categoriesQuery.refetch(),
+      interactionsQuery.refetch(),
+      bookmarksQuery.refetch(),
+    ]);
+    toast.success("Courses refreshed");
+  };
+
+  const courseProgressMap = useMemo(() => {
+    const map = new Map<number, number>();
+    if (!interactionsQuery.data) return map;
+
+    for (const interaction of interactionsQuery.data) {
+      const existing = map.get(interaction.courseId) ?? 0;
+      const completion = Math.max(existing, interaction.completionPercentage ?? 0);
+      if (interaction.interactionType === "completed") {
+        map.set(interaction.courseId, 100);
+      } else if (interaction.interactionType === "started" || completion > 0) {
+        map.set(interaction.courseId, Math.max(5, completion));
+      }
+    }
+
+    return map;
+  }, [interactionsQuery.data]);
+
+  const continueCourse = useMemo(() => {
+    const candidate = filteredCourses.find((course) => {
+      const progress = courseProgressMap.get(course.id) ?? 0;
+      return progress > 0 && progress < 100;
+    });
+
+    return candidate ?? null;
+  }, [courseProgressMap, filteredCourses]);
+
+  const continueProgress = continueCourse ? courseProgressMap.get(continueCourse.id) ?? 0 : 0;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       {/* Nav */}
@@ -138,6 +191,53 @@ export default function Courses() {
       </motion.div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+          <Card className="surface-card overflow-hidden p-0">
+            <div className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 p-6 text-white">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.2),_transparent_30%)]" />
+              <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-100">Fluid learning flow</p>
+                  <h2 className="mt-2 text-2xl font-bold">Continue your path without context switching</h2>
+                  <p className="mt-2 text-blue-100">Jump back into your ongoing course or start a new one from this catalog.</p>
+                </div>
+                {continueCourse ? (
+                  <Button onClick={() => navigate(`/course/${continueCourse.id}`)} className="rounded-2xl bg-white text-indigo-700 hover:bg-blue-50">
+                    <PlayCircle className="mr-2 h-4 w-4" /> Continue {continueProgress}%
+                  </Button>
+                ) : (
+                  <Button onClick={() => navigate("/dashboard")} className="rounded-2xl bg-white text-indigo-700 hover:bg-blue-50">
+                    Open dashboard
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="grid gap-4 border-t border-slate-200 bg-white p-5 md:grid-cols-4">
+              {[
+                { title: "Choose course", text: "Pick your target skill from the filtered list." },
+                { title: "Start learning", text: "Begin with guided modules and key concepts." },
+                { title: "Track progress", text: "See your completion and resume instantly." },
+                { title: "Apply + advance", text: "Move to next recommendations with momentum." },
+              ].map((node, index) => (
+                <motion.div
+                  key={node.title}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 + index * 0.06 }}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                >
+                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    <Route className="h-3.5 w-3.5 text-blue-600" /> Step {index + 1}
+                  </div>
+                  <p className="font-semibold text-slate-900">{node.title}</p>
+                  <p className="mt-1 text-sm text-slate-600">{node.text}</p>
+                </motion.div>
+              ))}
+            </div>
+          </Card>
+        </motion.div>
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Sidebar */}
           <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="lg:col-span-1">
@@ -228,6 +328,15 @@ export default function Courses() {
                   <p className="text-sm text-slate-600">
                     Showing <span className="font-bold text-slate-900">{filteredCourses.length}</span> course{filteredCourses.length !== 1 ? "s" : ""}
                   </p>
+                  <Button
+                    variant="outline"
+                    onClick={handleRefreshCourses}
+                    disabled={coursesQuery.isFetching || categoriesQuery.isFetching || interactionsQuery.isFetching}
+                    className="rounded-xl"
+                  >
+                    <RefreshCw className={`mr-2 h-4 w-4 ${(coursesQuery.isFetching || categoriesQuery.isFetching || interactionsQuery.isFetching) ? "animate-spin" : ""}`} />
+                    Refresh
+                  </Button>
                 </motion.div>
 
                 {filteredCourses.length > 0 ? (
@@ -277,8 +386,19 @@ export default function Courses() {
                                   {bookmarkedIds.has(course.id) ? <BookmarkCheck className="w-5 h-5" /> : <Bookmark className="w-5 h-5" />}
                                 </button>
                               </div>
+
+                              {(courseProgressMap.get(course.id) ?? 0) > 0 && (
+                                <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50/70 p-3">
+                                  <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
+                                    <span>Your progress</span>
+                                    <span>{courseProgressMap.get(course.id)}%</span>
+                                  </div>
+                                  <Progress value={courseProgressMap.get(course.id)} className="h-2" />
+                                </div>
+                              )}
+
                               <Button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-xl shadow-md shadow-blue-500/15 group-hover:shadow-lg transition-all">
-                                Compare & View <ExternalLink className="w-4 h-4 ml-2" />
+                                {(courseProgressMap.get(course.id) ?? 0) > 0 ? "Continue & View" : "Compare & View"} <ExternalLink className="w-4 h-4 ml-2" />
                               </Button>
                             </div>
                           </Card>

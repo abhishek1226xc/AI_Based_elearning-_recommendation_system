@@ -1,4 +1,4 @@
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -62,7 +62,7 @@ export const appRouter = router({
         // Create session
         const token = await sdk.createSessionToken(user.openId, { name: user.name || "" });
         const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
+        ctx.res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_YEAR_MS });
         return { success: true, user: { id: user.id, name: user.name, email: user.email } };
       }),
 
@@ -83,7 +83,7 @@ export const appRouter = router({
         // Create session
         const token = await sdk.createSessionToken(user.openId, { name: user.name || "" });
         const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
+        ctx.res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_YEAR_MS });
         return { success: true, user: { id: user.id, name: user.name, email: user.email } };
       }),
   }),
@@ -150,6 +150,7 @@ export const appRouter = router({
         preferredDifficulty: z.enum(["beginner", "intermediate", "advanced"]).optional(),
         learningStyle: z.string().optional(),
         bio: z.string().optional(),
+        onboardingCompleted: z.boolean().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const profile = await getUserProfile(ctx.user.id);
@@ -161,6 +162,7 @@ export const appRouter = router({
           preferredDifficulty: input.preferredDifficulty || profile?.preferredDifficulty,
           learningStyle: input.learningStyle || profile?.learningStyle,
           bio: input.bio || profile?.bio,
+          onboardingCompletedAt: input.onboardingCompleted ? new Date() : profile?.onboardingCompletedAt,
         };
         return upsertUserProfile(ctx.user.id, updated);
       }),

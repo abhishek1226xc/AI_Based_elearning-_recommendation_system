@@ -5,6 +5,7 @@ import { db } from "../_core/db";
 import {
   generateRecommendations,
   getRecommendationsForUser,
+  getRecommendationRefreshStatus,
 } from "../recommendationEngine";
 import {
   findRelatedCourses,
@@ -13,6 +14,7 @@ import {
   getPrerequisiteCourses,
   getAdvancedCourses,
 } from "../ml/ai-recommender";
+import { getStudyPatternInsights } from "../ml/pythonClient";
 
 const feedbackSchema = z.enum(["relevant", "not_relevant", "already_done"]);
 
@@ -166,12 +168,22 @@ export const recommendationsRouter = router({
           )
           .get(input.userId) as { category: string } | undefined;
 
+        const refreshStatus = getRecommendationRefreshStatus(input.userId);
+
         return {
           totalRecommendations: totals.totalRecommendations ?? 0,
           avgScore: Number(totals.avgScore ?? 0),
           algorithmUsed: latest?.algorithm ?? "n/a",
           expiresAt: latest ? toIsoFromUnix(latest.expiresAt) : new Date(0).toISOString(),
           topCategory: topCategory?.category ?? "n/a",
+          shouldRefresh: refreshStatus.shouldRefresh,
+          refreshReason: refreshStatus.refreshReason,
+          latestGeneratedAt: refreshStatus.latestGeneratedAt
+            ? toIsoFromUnix(refreshStatus.latestGeneratedAt)
+            : new Date(0).toISOString(),
+          latestSourceUpdate: refreshStatus.latestSourceUpdate
+            ? toIsoFromUnix(refreshStatus.latestSourceUpdate)
+            : new Date(0).toISOString(),
         };
       } catch (error: unknown) {
         if (error instanceof TRPCError) throw error;
@@ -274,6 +286,46 @@ export const recommendationsRouter = router({
       } catch (error: unknown) {
         const message =
           error instanceof Error ? error.message : "Failed to fetch advanced courses";
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message,
+        });
+      }
+    }),
+
+  studyPattern: protectedProcedure
+    .input(
+      z.object({
+        userId: z.number().int().positive().optional(),
+        lookbackDays: z.number().int().min(7).max(180).default(30),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      try {
+        const targetUserId = input.userId ?? ctx.user.id;
+        const isOwner = ctx.user.id === targetUserId;
+        const isAdmin = ctx.user.role === "admin";
+
+        if (!isOwner && !isAdmin) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You are not allowed to access this study pattern",
+          });
+        }
+
+        const insights = await getStudyPatternInsights(targetUserId, input.lookbackDays);
+        if (!insights) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "ML service unavailable for study-pattern insights",
+          });
+        }
+
+        return insights;
+      } catch (error: unknown) {
+        if (error instanceof TRPCError) throw error;
+        const message =
+          error instanceof Error ? error.message : "Failed to fetch study pattern";
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message,

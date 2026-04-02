@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
-import { BookOpen, Mail, Lock, User, ArrowRight, Loader2, Sparkles, Eye, EyeOff } from "lucide-react";
+import { BookOpen, Mail, Lock, User, ArrowRight, Loader2, Sparkles, Eye, EyeOff, ShieldCheck, Layers3 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -32,7 +32,7 @@ export default function AuthPage() {
                 toast.success("Account created! 🎉");
             }
             await utils.auth.me.invalidate();
-            navigate("/dashboard");
+            navigate("/onboarding");
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : "Something went wrong";
             toast.error(message);
@@ -40,13 +40,18 @@ export default function AuthPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex">
+        <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.22),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(168,85,247,0.16),_transparent_22%),linear-gradient(180deg,_#f8fbff_0%,_#eef4ff_45%,_#e9eefb_100%)] flex">
+            <div className="soft-grid pointer-events-none absolute inset-0 opacity-40" />
+            <div className="pointer-events-none absolute -left-20 top-24 h-64 w-64 rounded-full bg-blue-400/20 blur-3xl" />
+            <div className="pointer-events-none absolute right-10 top-10 h-72 w-72 rounded-full bg-violet-400/20 blur-3xl" />
+            <div className="pointer-events-none absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-cyan-300/20 blur-3xl" />
+
             {/* Left: Branding */}
             <motion.div
                 initial={{ opacity: 0, x: -40 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.6 }}
-                className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 relative overflow-hidden"
+                className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950"
             >
                 <div className="absolute inset-0">
                     {Array.from({ length: 20 }).map((_, i) => (
@@ -64,6 +69,7 @@ export default function AuthPage() {
                         />
                     ))}
                 </div>
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.08),_transparent_28%),linear-gradient(135deg,transparent,rgba(255,255,255,0.04),transparent)]" />
                 <div className="relative z-10 flex flex-col justify-center px-16 text-white">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -84,6 +90,25 @@ export default function AuthPage() {
                             AI-powered recommendations for 1000+ courses.
                             Compare ratings, reviews, and find your perfect match in one place.
                         </p>
+                        <div className="grid gap-3 max-w-sm mb-8">
+                            {[
+                                { icon: ShieldCheck, title: "Secure sign-in", text: "Keep your learning profile saved across sessions." },
+                                { icon: Layers3, title: "Structured journey", text: "Onboarding flows into a roadmap, then course picks." },
+                            ].map((item) => {
+                                const Icon = item.icon;
+                                return (
+                                    <div key={item.title} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-md">
+                                        <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl bg-white/15">
+                                            <Icon className="h-5 w-5 text-cyan-200" />
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-white">{item.title}</p>
+                                            <p className="text-sm text-blue-100">{item.text}</p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                         <div className="grid grid-cols-2 gap-4 max-w-sm">
                             {[
                                 { n: "1000+", l: "Courses Available" },
@@ -108,12 +133,12 @@ export default function AuthPage() {
             </motion.div>
 
             {/* Right: Auth Form */}
-            <div className="flex-1 flex items-center justify-center px-6 py-12">
+            <div className="flex flex-1 items-center justify-center px-6 py-12 relative z-10">
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.2 }}
-                    className="w-full max-w-md"
+                    className="w-full max-w-lg"
                 >
                     <div className="lg:hidden flex items-center gap-2 mb-8 justify-center">
                         <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
@@ -122,7 +147,7 @@ export default function AuthPage() {
                         <span className="text-2xl font-bold text-slate-900">EduAI</span>
                     </div>
 
-                    <Card className="p-8 border-slate-200/80 bg-white/70 backdrop-blur-sm shadow-xl shadow-blue-500/5">
+                    <Card className="surface-card surface-card-hover p-8 shadow-[0_28px_70px_-30px_rgba(37,99,235,0.35)]">
                         <div className="text-center mb-8">
                             <h2 className="text-2xl font-bold text-slate-900">
                                 {mode === "login" ? "Welcome Back" : "Create Account"}
@@ -132,6 +157,17 @@ export default function AuthPage() {
                                     ? "Sign in to your personalized recommendations"
                                     : "Start getting AI-powered course recommendations"}
                             </p>
+                            <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-xs font-medium text-slate-500">
+                                {[
+                                    "Fast onboarding",
+                                    "Persistent profile",
+                                    "AI roadmap ready",
+                                ].map((label) => (
+                                    <span key={label} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
+                                        {label}
+                                    </span>
+                                ))}
+                            </div>
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-5">
@@ -201,7 +237,7 @@ export default function AuthPage() {
                                 <Button
                                     type="submit"
                                     disabled={isLoading}
-                                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-xl py-6 text-lg shadow-lg shadow-blue-500/25"
+                                    className="w-full rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 py-6 text-lg shadow-xl shadow-blue-500/25 transition-all hover:from-blue-700 hover:to-violet-700"
                                 >
                                     {isLoading ? (
                                         <>
@@ -231,7 +267,7 @@ export default function AuthPage() {
                         </div>
                     </Card>
 
-                    <p className="text-center text-xs text-slate-400 mt-6">
+                    <p className="text-center text-xs text-slate-500 mt-6">
                         <Sparkles className="w-3 h-3 inline mr-1" />
                         AI recommendations powered by content-based & collaborative filtering
                     </p>
