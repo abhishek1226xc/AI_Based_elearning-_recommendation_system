@@ -35,4 +35,4 @@ export interface RecommendationStats {
 	topCategory: string;
 }
 
-export type FeedbackType = "relevant" | "not_relevant" | "already_done";
+export type FeedbackType = "positive" | "negative";

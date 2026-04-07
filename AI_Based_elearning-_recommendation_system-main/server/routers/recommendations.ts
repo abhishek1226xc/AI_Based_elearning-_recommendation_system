@@ -16,7 +16,7 @@ import {
 } from "../ml/ai-recommender";
 import { getStudyPatternInsights } from "../ml/pythonClient";
 
-const feedbackSchema = z.enum(["relevant", "not_relevant", "already_done"]);
+const feedbackSchema = z.enum(["positive", "negative"]);
 
 const toIsoFromUnix = (unixTs: number): string => {
   const millis = unixTs > 1_000_000_000_000 ? unixTs : unixTs * 1000;

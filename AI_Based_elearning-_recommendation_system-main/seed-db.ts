@@ -22,7 +22,9 @@ db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 
 // ─── Drop and recreate tables ────────────────────────────────────────
+db.pragma("foreign_keys = OFF");
 db.exec(`
+    DROP TABLE IF EXISTS courses_fts;
   DROP TABLE IF EXISTS recommendationFeedback;
   DROP TABLE IF EXISTS recommendations;
   DROP TABLE IF EXISTS courseInteractions;
@@ -33,6 +35,7 @@ db.exec(`
   DROP TABLE IF EXISTS courses;
   DROP TABLE IF EXISTS users;
 `);
+db.pragma("foreign_keys = ON");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
@@ -149,6 +152,24 @@ db.exec(`
     feedback TEXT NOT NULL,
     timestamp INTEGER NOT NULL DEFAULT (unixepoch())
   );
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS courses_fts USING fts5(
+        title,
+        description,
+        tags,
+        content=courses,
+        content_rowid=id
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_courseInteractions_userId ON courseInteractions (userId);
+    CREATE INDEX IF NOT EXISTS idx_courseInteractions_courseId ON courseInteractions (courseId);
+    CREATE INDEX IF NOT EXISTS idx_userProgress_userId ON userProgress (userId);
+    CREATE INDEX IF NOT EXISTS idx_bookmarks_userId ON bookmarks (userId);
+    CREATE INDEX IF NOT EXISTS idx_recommendations_userId ON recommendations (userId);
+    CREATE INDEX IF NOT EXISTS idx_recommendations_expiresAt ON recommendations (expiresAt);
+    CREATE INDEX IF NOT EXISTS idx_platformRatings_courseId ON platformRatings (courseId);
+    CREATE INDEX IF NOT EXISTS idx_recommendationFeedback_userId ON recommendationFeedback (userId);
+    CREATE INDEX IF NOT EXISTS idx_recommendationFeedback_recommendationId ON recommendationFeedback (recommendationId);
 `);
 
 // ─── Seed data ───────────────────────────────────────────────────────
@@ -614,6 +635,9 @@ for (const c of coursesData) {
         now, now
     );
 }
+
+db.exec("INSERT INTO courses_fts(courses_fts) VALUES ('rebuild')");
+
 console.log(`✅ Seeded ${coursesData.length} courses with platform data (now with comprehensive coverage for each topic!)`);
 
 // ── Platform Ratings (cross-platform comparison) ─────────────────────
@@ -657,6 +681,136 @@ const insertProfile = db.prepare(
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 );
 
+function generateSyntheticUsers() {
+    const interestClusters = [
+        {
+            name: "Web Dev",
+            interests: ["Web Development"],
+            skills: ["HTML", "CSS", "JavaScript", "React"],
+            goals: ["Frontend Developer"],
+            preferredDifficulty: "intermediate",
+            learningStyle: "hands-on",
+            courseIds: [1, 6, 8, 13, 26, 27, 28, 29, 30],
+        },
+        {
+            name: "Data Science",
+            interests: ["Data Science"],
+            skills: ["Python", "Pandas", "SQL", "Statistics"],
+            goals: ["Data Analyst"],
+            preferredDifficulty: "intermediate",
+            learningStyle: "visual",
+            courseIds: [4, 7, 16, 21, 22, 23, 24, 25],
+        },
+        {
+            name: "AI/ML",
+            interests: ["Machine Learning", "Artificial Intelligence"],
+            skills: ["Python", "TensorFlow", "PyTorch", "NLP"],
+            goals: ["ML Engineer"],
+            preferredDifficulty: "advanced",
+            learningStyle: "project-based",
+            courseIds: [2, 5, 10, 18, 31, 32, 33, 34, 35, 36],
+        },
+        {
+            name: "DevOps",
+            interests: ["DevOps", "Cloud Computing"],
+            skills: ["Docker", "Linux", "AWS", "Kubernetes"],
+            goals: ["DevOps Engineer"],
+            preferredDifficulty: "intermediate",
+            learningStyle: "video",
+            courseIds: [9, 11, 19, 38],
+        },
+        {
+            name: "Mobile",
+            interests: ["Mobile Development"],
+            skills: ["Kotlin", "Flutter", "Android", "iOS"],
+            goals: ["Mobile Developer"],
+            preferredDifficulty: "beginner",
+            learningStyle: "reading",
+            courseIds: [15, 20],
+        },
+    ] as const;
+
+    const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+    const randomInt = (min: number, max: number): number =>
+        Math.floor(Math.random() * (max - min + 1)) + min;
+    const sampleUnique = (arr: number[], count: number): number[] => {
+        const copy = [...arr];
+        const out: number[] = [];
+        while (copy.length > 0 && out.length < count) {
+            const idx = Math.floor(Math.random() * copy.length);
+            out.push(copy[idx]);
+            copy.splice(idx, 1);
+        }
+        return out;
+    };
+
+    let syntheticInteractions = 0;
+
+    for (let i = 1; i <= 50; i++) {
+        const cluster = pick([...interestClusters]);
+        const openId = `synthetic-user-${i}`;
+        const name = `Synthetic User ${i}`;
+        const email = `user${i}@example.com`;
+        const passwordHash = hashPassword(`user${i}pass`);
+
+        const result = insertUser.run(openId, name, email, passwordHash, "email", "user", now, now, now);
+        const userId = Number(result.lastInsertRowid);
+
+        insertProfile.run(
+            userId,
+            JSON.stringify(cluster.skills),
+            JSON.stringify(cluster.interests),
+            JSON.stringify(cluster.goals),
+            cluster.preferredDifficulty,
+            cluster.learningStyle,
+            `${cluster.name} focused learner`,
+            now,
+            now
+        );
+
+        const interactionCount = randomInt(5, 15);
+        let candidateCourses = [...cluster.courseIds];
+
+        if (Math.random() < 0.3) {
+            const otherCluster = pick(
+                interestClusters.filter((item) => item.name !== cluster.name) as unknown as Array<(typeof interestClusters)[number]>
+            );
+            candidateCourses = [...new Set([...candidateCourses, ...sampleUnique([...otherCluster.courseIds], randomInt(2, 4))])];
+        }
+
+        const pickedCourses = sampleUnique(candidateCourses, interactionCount);
+        for (const courseId of pickedCourses) {
+            const roll = Math.random();
+            const interactionType = roll < 0.6 ? "viewed" : roll < 0.9 ? "rated" : "bookmarked";
+            const rating = interactionType === "rated" ? randomInt(400, 500) : null;
+            const completion =
+                interactionType === "viewed"
+                    ? randomInt(10, 40)
+                    : interactionType === "rated"
+                        ? randomInt(60, 100)
+                        : 0;
+            const timeSpent =
+                interactionType === "bookmarked"
+                    ? 0
+                    : completion * randomInt(8, 18);
+
+            insertInteraction.run(
+                userId,
+                courseId,
+                interactionType,
+                rating,
+                timeSpent,
+                completion,
+                now - randomInt(0, 30 * 24 * 60 * 60)
+            );
+            syntheticInteractions += 1;
+        }
+    }
+
+    console.log("✅ Seeded 50 synthetic users for collaborative filtering");
+    console.log(`✅ Seeded ${syntheticInteractions} synthetic interactions`);
+}
+
 const profilesData = [
     [1, ["JavaScript", "React", "Python"], ["Web Development", "AI"], ["Full Stack Developer"], "intermediate", "visual", "Full-stack dev exploring AI"],
     [2, ["Python", "SQL"], ["Data Science", "ML"], ["Data Scientist"], "intermediate", "hands-on", "Data enthusiast"],
@@ -698,23 +852,25 @@ const insertInteraction = db.prepare(
 );
 
 const interactions = [
-    [1, 1, "viewed", null, 120, 0], [1, 1, "bookmarked", null, 0, 0],
-    [1, 6, "viewed", null, 60, 0], [1, 8, "viewed", null, 90, 0],
-    [1, 2, "viewed", null, 45, 0], [1, 8, "rated", 450, 0, 0],
-    [2, 4, "viewed", null, 180, 0], [2, 4, "rated", 470, 0, 0],
-    [2, 2, "viewed", null, 90, 0], [2, 7, "viewed", null, 60, 0],
-    [3, 15, "viewed", null, 45, 0], [3, 20, "viewed", null, 30, 0],
-    [3, 3, "viewed", null, 60, 0],
-    [4, 5, "viewed", null, 120, 0], [4, 5, "rated", 490, 0, 0],
-    [4, 2, "viewed", null, 180, 0], [4, 18, "viewed", null, 90, 0],
-    [5, 11, "viewed", null, 60, 0], [5, 9, "viewed", null, 90, 0],
-    [5, 19, "viewed", null, 45, 0],
+    [1, 1, "viewed", null, 120, 24], [1, 1, "bookmarked", null, 0, 0],
+    [1, 6, "viewed", null, 240, 38], [1, 8, "viewed", null, 180, 33],
+    [1, 2, "viewed", null, 95, 16], [1, 8, "rated", 450, 420, 82],
+    [2, 4, "viewed", null, 300, 40], [2, 4, "rated", 470, 520, 88],
+    [2, 2, "viewed", null, 150, 21], [2, 7, "viewed", null, 135, 27],
+    [3, 15, "viewed", null, 75, 18], [3, 20, "viewed", null, 70, 22],
+    [3, 3, "viewed", null, 130, 29],
+    [4, 5, "viewed", null, 280, 36], [4, 5, "rated", 490, 600, 96],
+    [4, 2, "viewed", null, 360, 34], [4, 18, "viewed", null, 210, 26],
+    [5, 11, "viewed", null, 160, 28], [5, 9, "viewed", null, 210, 35],
+    [5, 19, "bookmarked", null, 0, 0],
 ];
 
 for (const [userId, courseId, type, rating, time, pct] of interactions) {
     insertInteraction.run(userId, courseId, type, rating, time, pct, now - Math.floor(Math.random() * 604800));
 }
 console.log(`✅ Seeded ${interactions.length} interactions`);
+
+generateSyntheticUsers();
 
 // ── User Progress (tracking bookmarked courses) ──────────────────────
 const insertProgress = db.prepare(
@@ -723,12 +879,12 @@ const insertProgress = db.prepare(
 );
 
 const progressData = [
-    [1, 1, now - 604800, 65, "in-progress", 2400, now - 3600],
-    [1, 8, now - 1209600, 30, "in-progress", 900, now - 86400],
+    [1, 1, now - 604800, 24, "in-progress", 120, now - 3600],
+    [1, 8, now - 1209600, 82, "in-progress", 600, now - 86400],
     [1, 6, now - 2592000, 100, "completed", 4200, now - 604800],
-    [1, 2, now - 172800, 10, "enrolled", 300, now - 172800],
-    [2, 4, now - 604800, 45, "in-progress", 1800, now - 7200],
-    [2, 2, now - 1209600, 20, "enrolled", 600, now - 259200],
+    [1, 2, now - 172800, 16, "enrolled", 95, now - 172800],
+    [2, 4, now - 604800, 88, "in-progress", 820, now - 7200],
+    [2, 2, now - 1209600, 21, "enrolled", 150, now - 259200],
 ];
 
 for (const [userId, courseId, enrollDate, pct, status, time, lastAccess] of progressData) {

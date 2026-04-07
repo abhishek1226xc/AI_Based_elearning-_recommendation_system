@@ -38,8 +38,8 @@ export function RecommendationsPanel({ userId }: Props) {
     submitFeedback,
   } = useRecommendations(userId);
 
-  const onFeedback = (recommendationId: number, type: FeedbackType) => {
-    submitFeedback(recommendationId, type);
+  const onFeedback = async (recommendationId: number, type: FeedbackType) => {
+    await submitFeedback(recommendationId, type);
   };
 
   const algorithmLabel = stats?.algorithmUsed ?? "n/a";

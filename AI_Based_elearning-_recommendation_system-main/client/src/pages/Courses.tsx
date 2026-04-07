@@ -60,6 +60,13 @@ export default function Courses() {
     { limit: 100 },
     { refetchOnWindowFocus: true, refetchInterval: 30000 }
   );
+  const searchResultsQuery = trpc.courses.searchCourses.useQuery(
+    { query: searchQuery.trim() },
+    {
+      enabled: searchQuery.trim().length > 0,
+      staleTime: 1000 * 30,
+    }
+  );
   const categoriesQuery = trpc.courses.categories.useQuery(undefined, {
     refetchOnWindowFocus: true,
   });
@@ -68,6 +75,7 @@ export default function Courses() {
   const addBookmark = trpc.bookmarks.add.useMutation();
   const removeBookmark = trpc.bookmarks.remove.useMutation();
 
+  type CourseItem = NonNullable<typeof coursesQuery.data>[number];
   type BookmarkItem = NonNullable<typeof bookmarksQuery.data>[number];
 
   const bookmarkedIds = useMemo(() => {
@@ -91,8 +99,12 @@ export default function Courses() {
   };
 
   const filteredCourses = useMemo(() => {
-    if (!coursesQuery.data) return [];
-    let filtered = coursesQuery.data.filter(course => {
+    const sourceCourses: CourseItem[] = searchQuery.trim().length > 0
+      ? ((searchResultsQuery.data as CourseItem[] | undefined) ?? [])
+      : (coursesQuery.data ?? []);
+    if (!sourceCourses.length) return [];
+
+    let filtered = sourceCourses.filter(course => {
       const matchesSearch = !searchQuery ||
         course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         course.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -107,7 +119,7 @@ export default function Courses() {
       return (b.learnerCount || 0) - (a.learnerCount || 0);
     });
     return filtered;
-  }, [coursesQuery.data, searchQuery, selectedCategory, selectedDifficulty, sortBy]);
+  }, [coursesQuery.data, searchResultsQuery.data, searchQuery, selectedCategory, selectedDifficulty, sortBy]);
 
   const activeFilters = [searchQuery, selectedCategory, selectedDifficulty].filter(Boolean).length;
 
@@ -320,7 +332,7 @@ export default function Courses() {
 
           {/* Courses Grid */}
           <div className="lg:col-span-3">
-            {coursesQuery.isLoading ? (
+            {coursesQuery.isLoading || searchResultsQuery.isLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">{Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}</div>
             ) : (
               <>

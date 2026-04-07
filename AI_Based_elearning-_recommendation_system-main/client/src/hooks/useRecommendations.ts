@@ -82,6 +82,6 @@ export function useRecommendations(userId: number) {
     refresh,
     isRefreshing: refreshMutation.isPending,
     submitFeedback: (recommendationId: number, type: FeedbackType) =>
-      feedbackMutation.mutate({ recommendationId, feedback: type }),
+      feedbackMutation.mutateAsync({ recommendationId, feedback: type }),
   };
 }

@@ -1,9 +1,9 @@
-import { createHash } from "crypto";
+import bcrypt from "bcrypt";
 
-/**
- * Hash a password using SHA-256
- * Used for secure password storage and comparison
- */
 export function hashPassword(password: string): string {
-  return createHash("sha256").update(password).digest("hex");
+  return bcrypt.hashSync(password, 12);
+}
+
+export function verifyPassword(input: string, hash: string): boolean {
+  return bcrypt.compareSync(input, hash);
 }

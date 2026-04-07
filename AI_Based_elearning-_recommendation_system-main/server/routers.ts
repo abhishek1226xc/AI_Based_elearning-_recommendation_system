@@ -3,7 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
-import { hashPassword } from "./utils/crypto";
+import { hashPassword, verifyPassword } from "./utils/crypto";
 import {
   getAllCourses,
   getCourseById,
@@ -31,8 +31,14 @@ import { findRelatedCourses } from "./ml/ai-recommender";
 import { sdk } from "./_core/sdk";
 import { aiService } from "./_core/ai";
 import { recommendationsRouter } from "./routers/recommendations";
+import { db as sqliteDb } from "./_core/db";
 
 type SearchedCourse = Awaited<ReturnType<typeof searchCourses>>[number];
+
+const text500 = z.string().trim().max(500, "Must be 500 characters or fewer");
+const text50Array = z
+  .array(z.string().trim().max(50, "Each item must be 50 characters or fewer"))
+  .max(20, "Maximum 20 items allowed");
 
 export const appRouter = router({
   system: systemRouter,
@@ -47,9 +53,9 @@ export const appRouter = router({
 
     register: publicProcedure
       .input(z.object({
-        name: z.string().min(2),
-        email: z.string().email(),
-        password: z.string().min(6),
+        name: z.string().trim().min(2, "Name must be at least 2 characters").max(100),
+        email: z.string().trim().email("Please enter a valid email"),
+        password: z.string().min(6, "Password must be at least 6 characters"),
       }))
       .mutation(async ({ input, ctx }) => {
         const existing = await getUserByEmail(input.email);
@@ -68,16 +74,15 @@ export const appRouter = router({
 
     login: publicProcedure
       .input(z.object({
-        email: z.string().email(),
-        password: z.string(),
+        email: z.string().trim().email("Please enter a valid email"),
+        password: z.string().min(1, "Password is required"),
       }))
       .mutation(async ({ input, ctx }) => {
         const user = await getUserByEmail(input.email);
         if (!user || !user.passwordHash) {
           throw new Error("Invalid email or password");
         }
-        const pwHash = hashPassword(input.password);
-        if (pwHash !== user.passwordHash) {
+        if (!verifyPassword(input.password, user.passwordHash)) {
           throw new Error("Invalid email or password");
         }
         // Create session
@@ -100,6 +105,20 @@ export const appRouter = router({
     search: publicProcedure
       .input(z.object({ query: z.string(), limit: z.number().default(20) }))
       .query(async ({ input }) => searchCourses(input.query, input.limit)),
+
+    searchCourses: publicProcedure
+      .input(z.object({ query: z.string().trim().min(1, "Query is required") }))
+      .query(async ({ input }) => {
+        return sqliteDb
+          .prepare(
+            `SELECT courses.*
+             FROM courses
+             JOIN courses_fts ON courses.id = courses_fts.rowid
+             WHERE courses_fts MATCH ?
+             LIMIT 20`
+          )
+          .all(input.query);
+      }),
 
     searchWithAI: publicProcedure
       .input(z.object({ query: z.string(), limit: z.number().default(20) }))
@@ -132,6 +151,10 @@ export const appRouter = router({
       .input(z.object({ courseId: z.number() }))
       .query(async ({ input }) => getPlatformRatingsForCourse(input.courseId)),
 
+    getCoursePlatforms: publicProcedure
+      .input(z.object({ courseId: z.number().int().positive() }))
+      .query(async ({ input }) => getPlatformRatingsForCourse(input.courseId)),
+
     categories: publicProcedure.query(async () => [
       "Web Development", "Data Science", "Machine Learning",
       "Mobile Development", "DevOps", "Cloud Computing",
@@ -144,12 +167,12 @@ export const appRouter = router({
     get: protectedProcedure.query(async ({ ctx }) => getUserProfile(ctx.user.id)),
     update: protectedProcedure
       .input(z.object({
-        skills: z.array(z.string()).optional(),
-        interests: z.array(z.string()).optional(),
-        learningGoals: z.array(z.string()).optional(),
+        skills: text50Array.optional(),
+        interests: text50Array.optional(),
+        learningGoals: text50Array.optional(),
         preferredDifficulty: z.enum(["beginner", "intermediate", "advanced"]).optional(),
-        learningStyle: z.string().optional(),
-        bio: z.string().optional(),
+        learningStyle: z.string().trim().max(100, "Must be 100 characters or fewer").optional(),
+        bio: text500.optional(),
         onboardingCompleted: z.boolean().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
@@ -171,25 +194,28 @@ export const appRouter = router({
   bookmarks: router({
     list: protectedProcedure.query(async ({ ctx }) => getUserBookmarks(ctx.user.id)),
     add: protectedProcedure
-      .input(z.object({ courseId: z.number(), notes: z.string().optional() }))
+      .input(z.object({
+        courseId: z.number().int().positive(),
+        notes: text500.optional(),
+      }))
       .mutation(async ({ ctx, input }) => addBookmark(ctx.user.id, input.courseId, input.notes)),
     remove: protectedProcedure
-      .input(z.object({ courseId: z.number() }))
+      .input(z.object({ courseId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => removeBookmark(ctx.user.id, input.courseId)),
   }),
 
   enrollment: router({
     enrolledCourses: protectedProcedure.query(async ({ ctx }) => getUserEnrolledCourses(ctx.user.id)),
     enroll: protectedProcedure
-      .input(z.object({ courseId: z.number() }))
+      .input(z.object({ courseId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => recordCourseInteraction(ctx.user.id, input.courseId, "started")),
     recordInteraction: protectedProcedure
       .input(z.object({
-        courseId: z.number(),
+        courseId: z.number().int().positive(),
         interactionType: z.enum(["viewed", "started", "completed", "rated", "bookmarked"]),
-        rating: z.number().optional(),
-        timeSpent: z.number().optional(),
-        completionPercentage: z.number().optional(),
+        rating: z.number().int().min(0).max(500).optional(),
+        timeSpent: z.number().int().min(0).max(60 * 60 * 24).optional(),
+        completionPercentage: z.number().int().min(0).max(100).optional(),
       }))
       .mutation(async ({ ctx, input }) =>
         recordCourseInteraction(ctx.user.id, input.courseId, input.interactionType, input.rating, input.timeSpent, input.completionPercentage)),
@@ -200,21 +226,21 @@ export const appRouter = router({
 
   chat: router({
     createSession: protectedProcedure
-      .input(z.object({ title: z.string().optional() }))
+      .input(z.object({ title: z.string().trim().max(120, "Title must be 120 characters or fewer").optional() }))
       .mutation(async ({ ctx, input }) => createChatSession(ctx.user.id, input.title)),
 
     getSessions: protectedProcedure
       .query(async ({ ctx }) => getChatSessions(ctx.user.id)),
 
     getMessages: protectedProcedure
-      .input(z.object({ sessionId: z.number() }))
+      .input(z.object({ sessionId: z.number().int().positive() }))
       .query(async ({ input }) => getChatMessages(input.sessionId)),
 
     sendMessage: protectedProcedure
       .input(z.object({
-        sessionId: z.number(),
-        message: z.string(),
-        relatedCourseIds: z.array(z.number()).optional(),
+        sessionId: z.number().int().positive(),
+        message: z.string().trim().min(1, "Message cannot be empty").max(500, "Message must be 500 characters or fewer"),
+        relatedCourseIds: z.array(z.number().int().positive()).max(20).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         // Save user message
@@ -234,7 +260,7 @@ export const appRouter = router({
       }),
 
     deleteSession: protectedProcedure
-      .input(z.object({ sessionId: z.number() }))
+      .input(z.object({ sessionId: z.number().int().positive() }))
       .mutation(async ({ input }) => deleteChatSession(input.sessionId)),
   }),
 });

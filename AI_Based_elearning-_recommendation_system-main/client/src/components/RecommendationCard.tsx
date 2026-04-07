@@ -7,6 +7,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { FeedbackType, RecommendationItem } from "@shared/types";
+import { useState } from "react";
 import {
   BookOpen,
   Clock,
@@ -15,12 +16,11 @@ import {
   ThumbsDown,
   ThumbsUp,
   Users,
-  CheckCircle2,
 } from "lucide-react";
 
 interface Props {
   item: RecommendationItem;
-  onFeedback: (id: number, type: FeedbackType) => void;
+  onFeedback: (id: number, type: FeedbackType) => Promise<unknown>;
   recommendationId: number;
 }
 
@@ -54,6 +54,12 @@ const difficultyClasses: Record<RecommendationItem["difficulty"], string> = {
 export function RecommendationCard({ item, onFeedback, recommendationId }: Props) {
   const visibleTags = item.tags.slice(0, 4);
   const hiddenTagCount = Math.max(item.tags.length - visibleTags.length, 0);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+
+  const submitFeedback = async (type: FeedbackType) => {
+    await onFeedback(recommendationId, type);
+    setFeedbackMessage("Thanks for your feedback");
+  };
 
   return (
     <Card className="group relative overflow-hidden border-slate-200/80 bg-white/80 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-white/10 dark:bg-slate-900/75">
@@ -121,43 +127,29 @@ export function RecommendationCard({ item, onFeedback, recommendationId }: Props
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  aria-label="Mark recommendation as relevant"
+                  aria-label="Mark recommendation as positive"
                   size="icon-sm"
                   variant="ghost"
-                  onClick={() => onFeedback(recommendationId, "relevant")}
+                  onClick={() => submitFeedback("positive")}
                 >
                   <ThumbsUp className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Relevant</TooltipContent>
+              <TooltipContent>Helpful</TooltipContent>
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  aria-label="Mark recommendation as not relevant"
+                  aria-label="Mark recommendation as negative"
                   size="icon-sm"
                   variant="ghost"
-                  onClick={() => onFeedback(recommendationId, "not_relevant")}
+                  onClick={() => submitFeedback("negative")}
                 >
                   <ThumbsDown className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Not relevant</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  aria-label="Mark recommendation as already done"
-                  size="icon-sm"
-                  variant="ghost"
-                  onClick={() => onFeedback(recommendationId, "already_done")}
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Already done</TooltipContent>
+              <TooltipContent>Not helpful</TooltipContent>
             </Tooltip>
           </div>
 
@@ -173,6 +165,9 @@ export function RecommendationCard({ item, onFeedback, recommendationId }: Props
             </a>
           </Button>
         </div>
+        {feedbackMessage ? (
+          <p className="text-xs text-emerald-600">{feedbackMessage}</p>
+        ) : null}
       </CardContent>
     </Card>
   );

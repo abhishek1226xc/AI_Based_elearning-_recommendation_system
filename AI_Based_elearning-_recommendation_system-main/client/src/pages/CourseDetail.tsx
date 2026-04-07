@@ -86,7 +86,7 @@ export default function CourseDetail() {
 
   const utils = trpc.useUtils();
   const courseQuery = trpc.courses.getById.useQuery({ id: courseId });
-  const platformRatingsQuery = trpc.courses.platformRatings.useQuery(
+  const platformRatingsQuery = trpc.courses.getCoursePlatforms.useQuery(
     { courseId },
     { enabled: Boolean(courseId) }
   );
@@ -172,6 +172,14 @@ export default function CourseDetail() {
   const course = courseQuery.data;
   const tags = course.tags ? JSON.parse(course.tags) : [];
   const platformRatings = platformRatingsQuery.data || [];
+  const displayedRating = Math.max(
+    course.rating || 0,
+    course.platformRating || 0,
+    ...platformRatings.map((item: PlatformRatingItem) => item.rating || 0)
+  );
+  const freeAlternative = platformRatings.find(
+    (item: PlatformRatingItem) => item.price?.toLowerCase() === "free"
+  );
   const isRecommendationLoading = relatedQuery.isLoading || aiSuggestionsQuery.isLoading;
   const aiSuggestions = Array.isArray(aiSuggestionsQuery.data) ? aiSuggestionsQuery.data : [];
   const thisCourseProgress = interactionsQuery.data
@@ -302,6 +310,11 @@ export default function CourseDetail() {
           <div className="flex items-center gap-3 mb-3">
             <span className={`px-3 py-1 rounded-lg text-sm font-bold ${PLATFORM_COLORS[course.platform || ""] || "bg-white/20 text-white"}`}>{course.platform}</span>
             <span className="text-blue-200 font-medium">{course.platformPrice}</span>
+            {freeAlternative ? (
+              <span className="rounded-lg bg-emerald-100 px-3 py-1 text-sm font-bold text-emerald-700">
+                Free on {freeAlternative.platform}
+              </span>
+            ) : null}
           </div>
           <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-4xl lg:text-5xl font-bold mb-3">{course.title}</motion.h1>
           <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="text-blue-100 text-lg">By {course.instructor}</motion.p>
@@ -318,7 +331,7 @@ export default function CourseDetail() {
                   {[
                     { icon: Clock, label: "Duration", value: `${Math.round((course.duration || 0) / 60)}h`, color: "text-blue-600" },
                     { icon: Award, label: "Level", value: course.difficulty, color: "text-emerald-600", badge: true },
-                    { icon: Star, label: "Rating", value: ((course.rating || 0) / 100).toFixed(1), color: "text-amber-500", star: true },
+                    { icon: Star, label: "Rating", value: (displayedRating / 100).toFixed(1), color: "text-amber-500", star: true },
                     { icon: Users, label: "Learners", value: `${((course.learnerCount || 0) / 1000).toFixed(0)}K`, color: "text-indigo-600" },
                   ].map((s, i) => (
                     <motion.div key={i} variants={itemVariants} className="text-center">
@@ -453,7 +466,7 @@ export default function CourseDetail() {
               <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
                 <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
                   <Globe className="w-6 h-6 text-blue-600" />
-                  Cross-Platform Comparison
+                  Also Available On
                 </h2>
                 <Card className="mb-8 border-slate-200/80 bg-white/70 backdrop-blur-sm overflow-hidden">
                   <div className="overflow-x-auto">
@@ -610,6 +623,12 @@ export default function CourseDetail() {
                 <p><span className="font-semibold text-slate-900">Level:</span> <span className="capitalize">{course.difficulty}</span></p>
                 <p><span className="font-semibold text-slate-900">Price:</span> <span className="text-emerald-600 font-semibold">{course.platformPrice}</span></p>
                 <p><span className="font-semibold text-slate-900">Reviews:</span> {(course.reviewCount || 0).toLocaleString()}</p>
+                {freeAlternative ? (
+                  <p>
+                    <span className="font-semibold text-slate-900">Free alternative:</span>{" "}
+                    <span className="rounded-md bg-emerald-100 px-2 py-1 text-emerald-700">Free on {freeAlternative.platform}</span>
+                  </p>
+                ) : null}
               </div>
 
               <div className="border-t border-slate-200 pt-6 space-y-3">
@@ -637,7 +656,7 @@ export default function CourseDetail() {
                 </h4>
                 <ul className="space-y-2.5 text-sm text-slate-600">
                   {[
-                    `${((course.rating || 0) / 100).toFixed(1)}★ rating from ${(course.reviewCount || 0).toLocaleString()} reviews`,
+                    `${(displayedRating / 100).toFixed(1)}★ best rating across platforms`,
                     `${((course.learnerCount || 0) / 1000).toFixed(0)}K+ learners across platforms`,
                     platformRatings.length > 0 ? `Compared across ${platformRatings.length + 1} platforms` : "Top-rated in its category",
                     `${course.completionRate}% completion rate`,
