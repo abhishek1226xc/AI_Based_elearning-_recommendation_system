@@ -8,6 +8,18 @@ from typing import Optional
 
 ALLOWED_ALGORITHMS = {"content-based", "collaborative", "hybrid", "popularity"}
 
+WEIGHTS = {
+    "content_based": {"content": 0.7, "difficulty": 0.3},
+    "collaborative": {"collaborative": 0.65, "popularity": 0.35},
+    "hybrid": {
+        "content": 0.35,
+        "collaborative": 0.2,
+        "popularity": 0.2,
+        "rating": 0.15,
+        "difficulty": 0.1,
+    },
+}
+
 
 def _difficulty_match_score(preferred: Optional[str], current: Optional[str]) -> float:
     if not preferred or not current:
@@ -27,6 +39,32 @@ def _normalize(value: float, max_value: float) -> float:
     if max_value <= 0:
         return 0.0
     return max(0.0, min(1.0, value / max_value))
+
+
+def _top_signal_name(content: float, collaborative: float, popularity: float, difficulty: float) -> str:
+    signals = [
+        ("your interests", content),
+        ("similar learner activity", collaborative),
+        ("current popularity", popularity),
+        ("difficulty fit", difficulty),
+    ]
+    signals.sort(key=lambda item: item[1], reverse=True)
+    return signals[0][0]
+
+
+def _reason_content_based(category: str, content_score: float, difficulty_score: float) -> str:
+    signal = _top_signal_name(content_score, 0.0, 0.0, difficulty_score)
+    return f"Strong {signal} match in {category}"
+
+
+def _reason_collaborative(collaborative_score: float, popularity_score: float) -> str:
+    signal = _top_signal_name(0.0, collaborative_score, popularity_score, 0.0)
+    return f"Suggested from {signal}"
+
+
+def _reason_hybrid(category: str, content_score: float, collaborative_score: float, popularity_score: float, difficulty_score: float) -> str:
+    signal = _top_signal_name(content_score, collaborative_score, popularity_score, difficulty_score)
+    return f"Balanced recommendation from {signal} in {category}"
 
 router = APIRouter(tags=["recommendations"])
 
@@ -64,7 +102,7 @@ def get_recommendations(req: RecommendationRequest):
                     CourseRef(
                         course_id=course["id"],
                         score=round(popularity_score, 4),
-                        reason=f"Popular with {course.get('learnerCount', 0)} learners",
+                        reason=f"Popular with {course.get('learnerCount', 0)} learners in {course.get('category', 'learning')}",
                         algorithm="popularity",
                     )
                 )
@@ -106,20 +144,34 @@ def get_recommendations(req: RecommendationRequest):
             difficulty_score = _difficulty_match_score(preferred_difficulty, course.get("difficulty"))
 
             if algorithm == "content-based":
-                final_score = 0.7 * content_score + 0.3 * difficulty_score
-                reason = f"Matches your interests in {course.get('category', 'learning')}"
-            elif algorithm == "collaborative":
-                final_score = 0.65 * collaborative_score + 0.35 * popularity_score
-                reason = "Users with similar activity explored this course"
-            else:
-                final_score = (
-                    0.35 * content_score
-                    + 0.2 * collaborative_score
-                    + 0.2 * popularity_score
-                    + 0.15 * rating_score
-                    + 0.1 * difficulty_score
+                w = WEIGHTS["content_based"]
+                final_score = w["content"] * content_score + w["difficulty"] * difficulty_score
+                reason = _reason_content_based(
+                    course.get("category", "learning"), content_score, difficulty_score
                 )
-                reason = f"Balanced match for your profile and current trends"
+            elif algorithm == "collaborative":
+                w = WEIGHTS["collaborative"]
+                final_score = (
+                    w["collaborative"] * collaborative_score
+                    + w["popularity"] * popularity_score
+                )
+                reason = _reason_collaborative(collaborative_score, popularity_score)
+            else:
+                w = WEIGHTS["hybrid"]
+                final_score = (
+                    w["content"] * content_score
+                    + w["collaborative"] * collaborative_score
+                    + w["popularity"] * popularity_score
+                    + w["rating"] * rating_score
+                    + w["difficulty"] * difficulty_score
+                )
+                reason = _reason_hybrid(
+                    course.get("category", "learning"),
+                    content_score,
+                    collaborative_score,
+                    popularity_score,
+                    difficulty_score,
+                )
 
             scored_courses.append(
                 CourseRef(

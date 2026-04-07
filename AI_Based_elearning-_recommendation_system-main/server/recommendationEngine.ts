@@ -56,6 +56,20 @@ export type RecommendationRow = {
 const RECOMMENDATION_LIMIT = 12;
 const RECOMMENDATION_TTL_SECONDS = 24 * 60 * 60;
 
+const SCORE_WEIGHTS = {
+  hybrid: {
+    content: 0.35,
+    collaborative: 0.25,
+    popularity: 0.2,
+    rating: 0.1,
+    difficulty: 0.1,
+  },
+  coldStart: {
+    popularity: 0.65,
+    rating: 0.35,
+  },
+} as const;
+
 export type RecommendationRefreshStatus = {
   shouldRefresh: boolean;
   refreshReason:
@@ -190,6 +204,35 @@ const normalizedDifficultyScore = (
 const normalize = (value: number, max: number): number => {
   if (max <= 0) return 0;
   return Math.max(0, Math.min(1, value / max));
+};
+
+const getTopSignal = (signals: Array<{ name: string; value: number }>): string => {
+  const sorted = [...signals].sort((a, b) => b.value - a.value);
+  return sorted[0]?.name ?? "profile match";
+};
+
+const buildRecommendationReason = (
+  category: string,
+  hasBehaviorData: boolean,
+  scores: {
+    content: number;
+    collaborative: number;
+    popularity: number;
+    difficulty: number;
+  }
+): string => {
+  if (!hasBehaviorData) {
+    return `Popular course in ${category}`;
+  }
+
+  const topSignal = getTopSignal([
+    { name: "interest alignment", value: scores.content },
+    { name: "similar learner behavior", value: scores.collaborative },
+    { name: "category popularity", value: scores.popularity },
+    { name: "difficulty fit", value: scores.difficulty },
+  ]);
+
+  return `Recommended for ${topSignal} in ${category}`;
 };
 
 // Stable pseudo-random value in [0, 1) for controlled ranking diversity.
@@ -342,17 +385,28 @@ const buildRecommendationsForUser = (userId: number): RecommendationInsert[] => 
       const hasBehaviorData = interestSet.size > 0 || userInteractions.size > 0;
       const algorithm = hasBehaviorData ? "hybrid_v1" : "cold_start_popularity";
 
+      const hybridWeights = SCORE_WEIGHTS.hybrid;
+      const coldStartWeights = SCORE_WEIGHTS.coldStart;
+
       const finalScore = hasBehaviorData
-        ? 0.35 * contentScore + 0.25 * collaborativeScore + 0.2 * popularityScore + 0.1 * ratingScore + 0.1 * difficultyScore
-        : 0.65 * popularityScore + 0.35 * ratingScore;
+        ? hybridWeights.content * contentScore +
+          hybridWeights.collaborative * collaborativeScore +
+          hybridWeights.popularity * popularityScore +
+          hybridWeights.rating * ratingScore +
+          hybridWeights.difficulty * difficultyScore
+        : coldStartWeights.popularity * popularityScore +
+          coldStartWeights.rating * ratingScore;
 
       // Add small exploration jitter so manual refresh can rotate similarly scored courses.
       const jitter = (seededUnitRandom(userId, course.id, generationSeed) - 0.5) * 0.1;
       const diversifiedScore = Math.max(0, Math.min(1, finalScore + jitter));
 
-      const reason = hasBehaviorData
-        ? `Matched your interests in ${course.category}`
-        : `Popular course in ${course.category}`;
+      const reason = buildRecommendationReason(course.category, hasBehaviorData, {
+        content: contentScore,
+        collaborative: collaborativeScore,
+        popularity: popularityScore,
+        difficulty: difficultyScore,
+      });
 
       return {
         courseId: course.id,
