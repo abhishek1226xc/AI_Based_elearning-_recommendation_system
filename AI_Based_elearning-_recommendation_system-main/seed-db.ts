@@ -60,6 +60,7 @@ db.exec(`
     preferredDifficulty TEXT DEFAULT 'intermediate',
     learningStyle TEXT,
     bio TEXT,
+        onboardingCompletedAt INTEGER,
     createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
     updatedAt INTEGER NOT NULL DEFAULT (unixepoch())
   );
@@ -769,7 +770,7 @@ function generateSyntheticUsers() {
         );
 
         const interactionCount = randomInt(5, 15);
-        let candidateCourses = [...cluster.courseIds];
+        let candidateCourses: number[] = [...cluster.courseIds];
 
         if (Math.random() < 0.3) {
             const otherCluster = pick(
