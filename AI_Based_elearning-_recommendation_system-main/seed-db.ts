@@ -31,6 +31,9 @@ db.exec(`
   DROP TABLE IF EXISTS userProgress;
   DROP TABLE IF EXISTS bookmarks;
   DROP TABLE IF EXISTS platformRatings;
+    DROP TABLE IF EXISTS userLoginHistory;
+    DROP TABLE IF EXISTS userLearningPaths;
+    DROP TABLE IF EXISTS adminActivityLog;
   DROP TABLE IF EXISTS userProfiles;
   DROP TABLE IF EXISTS courses;
   DROP TABLE IF EXISTS users;
@@ -46,6 +49,14 @@ db.exec(`
     passwordHash TEXT,
     loginMethod TEXT,
     role TEXT NOT NULL DEFAULT 'user',
+        onboardingCompletedAt INTEGER,
+        isActive INTEGER NOT NULL DEFAULT 1,
+        isBanned INTEGER NOT NULL DEFAULT 0,
+        lastLoginIp TEXT,
+        resetPasswordToken TEXT,
+        resetPasswordExpiresAt INTEGER,
+        adminNotes TEXT,
+        sessionInvalidatedAt INTEGER,
     createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
     updatedAt INTEGER NOT NULL DEFAULT (unixepoch()),
     lastSignedIn INTEGER NOT NULL DEFAULT (unixepoch())
@@ -154,6 +165,37 @@ db.exec(`
     timestamp INTEGER NOT NULL DEFAULT (unixepoch())
   );
 
+    CREATE TABLE IF NOT EXISTS userLearningPaths (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        pathName TEXT NOT NULL,
+        description TEXT,
+        courseIds TEXT NOT NULL,
+        currentCourseIndex INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'active',
+        createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
+        updatedAt INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE TABLE IF NOT EXISTS userLoginHistory (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        loginAt INTEGER NOT NULL DEFAULT (unixepoch()),
+        ipAddress TEXT,
+        userAgent TEXT,
+        success INTEGER NOT NULL DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS adminActivityLog (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        adminId INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        action TEXT NOT NULL,
+        targetUserId INTEGER REFERENCES users(id),
+        targetCourseId INTEGER REFERENCES courses(id),
+        details TEXT,
+        performedAt INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
     CREATE VIRTUAL TABLE IF NOT EXISTS courses_fts USING fts5(
         title,
         description,
@@ -171,6 +213,9 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_platformRatings_courseId ON platformRatings (courseId);
     CREATE INDEX IF NOT EXISTS idx_recommendationFeedback_userId ON recommendationFeedback (userId);
     CREATE INDEX IF NOT EXISTS idx_recommendationFeedback_recommendationId ON recommendationFeedback (recommendationId);
+    CREATE INDEX IF NOT EXISTS idx_loginHistory_userId ON userLoginHistory(userId);
+    CREATE INDEX IF NOT EXISTS idx_learningPaths_userId ON userLearningPaths(userId);
+    CREATE INDEX IF NOT EXISTS idx_adminLog_adminId ON adminActivityLog(adminId);
 `);
 
 // ─── Seed data ───────────────────────────────────────────────────────
@@ -183,6 +228,9 @@ db.exec("DELETE FROM courseInteractions");
 db.exec("DELETE FROM userProgress");
 db.exec("DELETE FROM bookmarks");
 db.exec("DELETE FROM platformRatings");
+db.exec("DELETE FROM userLoginHistory");
+db.exec("DELETE FROM userLearningPaths");
+db.exec("DELETE FROM adminActivityLog");
 db.exec("DELETE FROM userProfiles");
 db.exec("DELETE FROM courses");
 db.exec("DELETE FROM users");
@@ -190,22 +238,104 @@ console.log("🗑️  Cleared existing data");
 
 // ── Users ────────────────────────────────────────────────────────────
 const insertUser = db.prepare(
-    `INSERT INTO users (openId, name, email, passwordHash, loginMethod, role, createdAt, updatedAt, lastSignedIn)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO users (
+        openId,
+        name,
+        email,
+        passwordHash,
+        loginMethod,
+        role,
+        onboardingCompletedAt,
+        isActive,
+        isBanned,
+        lastLoginIp,
+        resetPasswordToken,
+        resetPasswordExpiresAt,
+        adminNotes,
+        sessionInvalidatedAt,
+        createdAt,
+        updatedAt,
+        lastSignedIn
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 );
 
-const usersData = [
-    ["dev-user", "Dev User", "dev@local.dev", hashPassword("dev123"), "dev", "admin"],
-    ["user-alice", "Alice Johnson", "alice@example.com", hashPassword("alice123"), "email", "user"],
-    ["user-bob", "Bob Martinez", "bob@example.com", hashPassword("bob123"), "email", "user"],
-    ["user-carol", "Carol Williams", "carol@example.com", hashPassword("carol123"), "email", "user"],
-    ["user-dave", "Dave Chen", "dave@example.com", hashPassword("dave123"), "email", "user"],
+const randomInt = (min: number, max: number): number =>
+    Math.floor(Math.random() * (max - min + 1)) + min;
+const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const randomIp = () => `192.168.${randomInt(0, 254)}.${randomInt(1, 254)}`;
+
+const adminResult = insertUser.run(
+    "admin-user",
+    "Admin",
+    "admin@elearning.com",
+    hashPassword("Admin@1234"),
+    "email",
+    "admin",
+    now,
+    1,
+    0,
+    "192.168.1.10",
+    null,
+    null,
+    "Seeded admin account",
+    null,
+    now,
+    now,
+    now
+);
+const adminId = Number(adminResult.lastInsertRowid);
+
+const firstNames = [
+    "Ava", "Noah", "Liam", "Emma", "Mason", "Olivia", "Lucas", "Sophia", "Ethan", "Mia",
+    "Aria", "Logan", "Zoe", "Elijah", "Chloe", "James", "Isla", "Daniel", "Grace", "Henry",
+    "Nora", "Leo", "Lily", "Carter", "Hazel", "Jack", "Aurora", "Owen", "Riley", "Evelyn",
+];
+const lastNames = [
+    "Patel", "Garcia", "Lee", "Khan", "Nguyen", "Martinez", "Smith", "Brown", "Clark", "Lopez",
+    "Hernandez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "White", "Harris", "Martin",
 ];
 
-for (const [openId, name, email, pwHash, loginMethod, role] of usersData) {
-    insertUser.run(openId, name, email, pwHash, loginMethod, role, now, now, now);
+const studentUsers: Array<{ id: number; name: string; email: string; isBanned: number }> = [];
+
+for (let i = 1; i <= 30; i++) {
+    const first = firstNames[(i - 1) % firstNames.length];
+    const last = lastNames[(i - 1) % lastNames.length];
+    const name = `${first} ${last}`;
+    const email = `${first.toLowerCase()}.${last.toLowerCase()}${i}@example.com`;
+    const openId = `student-${i}`;
+    const isBanned = Math.random() < 0.1 ? 1 : 0;
+    const lastSignedIn = now - randomInt(0, 30 * 24 * 60 * 60);
+    const onboardingCompletedAt = now - randomInt(1, 21 * 24 * 60 * 60);
+
+    const result = insertUser.run(
+        openId,
+        name,
+        email,
+        hashPassword(`Student@${i}pass`),
+        "email",
+        "user",
+        onboardingCompletedAt,
+        1,
+        isBanned,
+        randomIp(),
+        null,
+        null,
+        isBanned ? "Flagged for repeated failed logins" : null,
+        null,
+        now,
+        now,
+        lastSignedIn
+    );
+
+    studentUsers.push({
+        id: Number(result.lastInsertRowid),
+        name,
+        email,
+        isBanned,
+    });
 }
-console.log(`✅ Seeded ${usersData.length} users`);
+
+console.log("✅ Seeded 1 admin user and 30 student users");
 
 // ── Courses ──────────────────────────────────────────────────────────
 const insertCourse = db.prepare(
@@ -676,222 +806,209 @@ for (const [courseId, platform, rating, reviewCount, price, url] of crossPlatfor
 }
 console.log(`✅ Seeded ${crossPlatformData.length} cross-platform ratings`);
 
-// ── User Profiles ────────────────────────────────────────────────────
+// ── Student data ─────────────────────────────────────────────────────
 const insertProfile = db.prepare(
-    `INSERT INTO userProfiles (userId, skills, interests, learningGoals, preferredDifficulty, learningStyle, bio, createdAt, updatedAt)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO userProfiles (
+        userId,
+        skills,
+        interests,
+        learningGoals,
+        preferredDifficulty,
+        learningStyle,
+        bio,
+        onboardingCompletedAt,
+        createdAt,
+        updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 );
-
-function generateSyntheticUsers() {
-    const interestClusters = [
-        {
-            name: "Web Dev",
-            interests: ["Web Development"],
-            skills: ["HTML", "CSS", "JavaScript", "React"],
-            goals: ["Frontend Developer"],
-            preferredDifficulty: "intermediate",
-            learningStyle: "hands-on",
-            courseIds: [1, 6, 8, 13, 26, 27, 28, 29, 30],
-        },
-        {
-            name: "Data Science",
-            interests: ["Data Science"],
-            skills: ["Python", "Pandas", "SQL", "Statistics"],
-            goals: ["Data Analyst"],
-            preferredDifficulty: "intermediate",
-            learningStyle: "visual",
-            courseIds: [4, 7, 16, 21, 22, 23, 24, 25],
-        },
-        {
-            name: "AI/ML",
-            interests: ["Machine Learning", "Artificial Intelligence"],
-            skills: ["Python", "TensorFlow", "PyTorch", "NLP"],
-            goals: ["ML Engineer"],
-            preferredDifficulty: "advanced",
-            learningStyle: "project-based",
-            courseIds: [2, 5, 10, 18, 31, 32, 33, 34, 35, 36],
-        },
-        {
-            name: "DevOps",
-            interests: ["DevOps", "Cloud Computing"],
-            skills: ["Docker", "Linux", "AWS", "Kubernetes"],
-            goals: ["DevOps Engineer"],
-            preferredDifficulty: "intermediate",
-            learningStyle: "video",
-            courseIds: [9, 11, 19, 38],
-        },
-        {
-            name: "Mobile",
-            interests: ["Mobile Development"],
-            skills: ["Kotlin", "Flutter", "Android", "iOS"],
-            goals: ["Mobile Developer"],
-            preferredDifficulty: "beginner",
-            learningStyle: "reading",
-            courseIds: [15, 20],
-        },
-    ] as const;
-
-    const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
-    const randomInt = (min: number, max: number): number =>
-        Math.floor(Math.random() * (max - min + 1)) + min;
-    const sampleUnique = (arr: number[], count: number): number[] => {
-        const copy = [...arr];
-        const out: number[] = [];
-        while (copy.length > 0 && out.length < count) {
-            const idx = Math.floor(Math.random() * copy.length);
-            out.push(copy[idx]);
-            copy.splice(idx, 1);
-        }
-        return out;
-    };
-
-    let syntheticInteractions = 0;
-
-    for (let i = 1; i <= 50; i++) {
-        const cluster = pick([...interestClusters]);
-        const openId = `synthetic-user-${i}`;
-        const name = `Synthetic User ${i}`;
-        const email = `user${i}@example.com`;
-        const passwordHash = hashPassword(`user${i}pass`);
-
-        const result = insertUser.run(openId, name, email, passwordHash, "email", "user", now, now, now);
-        const userId = Number(result.lastInsertRowid);
-
-        insertProfile.run(
-            userId,
-            JSON.stringify(cluster.skills),
-            JSON.stringify(cluster.interests),
-            JSON.stringify(cluster.goals),
-            cluster.preferredDifficulty,
-            cluster.learningStyle,
-            `${cluster.name} focused learner`,
-            now,
-            now
-        );
-
-        const interactionCount = randomInt(5, 15);
-        let candidateCourses: number[] = [...cluster.courseIds];
-
-        if (Math.random() < 0.3) {
-            const otherCluster = pick(
-                interestClusters.filter((item) => item.name !== cluster.name) as unknown as Array<(typeof interestClusters)[number]>
-            );
-            candidateCourses = [...new Set([...candidateCourses, ...sampleUnique([...otherCluster.courseIds], randomInt(2, 4))])];
-        }
-
-        const pickedCourses = sampleUnique(candidateCourses, interactionCount);
-        for (const courseId of pickedCourses) {
-            const roll = Math.random();
-            const interactionType = roll < 0.6 ? "viewed" : roll < 0.9 ? "rated" : "bookmarked";
-            const rating = interactionType === "rated" ? randomInt(400, 500) : null;
-            const completion =
-                interactionType === "viewed"
-                    ? randomInt(10, 40)
-                    : interactionType === "rated"
-                        ? randomInt(60, 100)
-                        : 0;
-            const timeSpent =
-                interactionType === "bookmarked"
-                    ? 0
-                    : completion * randomInt(8, 18);
-
-            insertInteraction.run(
-                userId,
-                courseId,
-                interactionType,
-                rating,
-                timeSpent,
-                completion,
-                now - randomInt(0, 30 * 24 * 60 * 60)
-            );
-            syntheticInteractions += 1;
-        }
-    }
-
-    console.log("✅ Seeded 50 synthetic users for collaborative filtering");
-    console.log(`✅ Seeded ${syntheticInteractions} synthetic interactions`);
-}
-
-const profilesData = [
-    [1, ["JavaScript", "React", "Python"], ["Web Development", "AI"], ["Full Stack Developer"], "intermediate", "visual", "Full-stack dev exploring AI"],
-    [2, ["Python", "SQL"], ["Data Science", "ML"], ["Data Scientist"], "intermediate", "hands-on", "Data enthusiast"],
-    [3, ["Java", "Kotlin"], ["Mobile", "Cloud"], ["Mobile Developer"], "beginner", "reading", "Learning mobile dev"],
-    [4, ["Python", "TensorFlow"], ["AI", "Deep Learning"], ["ML Engineer"], "advanced", "project-based", "AI researcher"],
-    [5, ["JavaScript", "Docker"], ["DevOps", "Cloud"], ["DevOps Engineer"], "intermediate", "video", "Infrastructure nerd"],
-];
-
-for (const [userId, skills, interests, goals, diff, style, bio] of profilesData) {
-    insertProfile.run(userId, JSON.stringify(skills), JSON.stringify(interests), JSON.stringify(goals), diff, style, bio, now, now);
-}
-console.log(`✅ Seeded ${profilesData.length} user profiles`);
-
-// ── Bookmarks ────────────────────────────────────────────────────────
 const insertBookmark = db.prepare(
     `INSERT INTO bookmarks (userId, courseId, notes, createdAt) VALUES (?, ?, ?, ?)`
 );
-
-const bookmarksData = [
-    [1, 1, "Want to review React fundamentals", now],
-    [1, 8, "Great React advanced course", now],
-    [1, 6, "Brush up on JS", now],
-    [1, 2, "Start ML journey", now],
-    [2, 4, "Main learning focus", now],
-    [2, 2, "Andrew Ng is amazing", now],
-    [3, 15, "Need for my project", now],
-    [3, 20, "Kotlin for Android", now],
-];
-
-for (const [userId, courseId, notes, ts] of bookmarksData) {
-    insertBookmark.run(userId, courseId, notes, ts);
-}
-console.log(`✅ Seeded ${bookmarksData.length} bookmarks`);
-
-// ── Course Interactions ──────────────────────────────────────────────
 const insertInteraction = db.prepare(
     `INSERT INTO courseInteractions (userId, courseId, interactionType, rating, timeSpent, completionPercentage, timestamp)
    VALUES (?, ?, ?, ?, ?, ?, ?)`
 );
-
-const interactions = [
-    [1, 1, "viewed", null, 120, 24], [1, 1, "bookmarked", null, 0, 0],
-    [1, 6, "viewed", null, 240, 38], [1, 8, "viewed", null, 180, 33],
-    [1, 2, "viewed", null, 95, 16], [1, 8, "rated", 450, 420, 82],
-    [2, 4, "viewed", null, 300, 40], [2, 4, "rated", 470, 520, 88],
-    [2, 2, "viewed", null, 150, 21], [2, 7, "viewed", null, 135, 27],
-    [3, 15, "viewed", null, 75, 18], [3, 20, "viewed", null, 70, 22],
-    [3, 3, "viewed", null, 130, 29],
-    [4, 5, "viewed", null, 280, 36], [4, 5, "rated", 490, 600, 96],
-    [4, 2, "viewed", null, 360, 34], [4, 18, "viewed", null, 210, 26],
-    [5, 11, "viewed", null, 160, 28], [5, 9, "viewed", null, 210, 35],
-    [5, 19, "bookmarked", null, 0, 0],
-];
-
-for (const [userId, courseId, type, rating, time, pct] of interactions) {
-    insertInteraction.run(userId, courseId, type, rating, time, pct, now - Math.floor(Math.random() * 604800));
-}
-console.log(`✅ Seeded ${interactions.length} interactions`);
-
-generateSyntheticUsers();
-
-// ── User Progress (tracking bookmarked courses) ──────────────────────
 const insertProgress = db.prepare(
     `INSERT INTO userProgress (userId, courseId, enrollmentDate, completionPercentage, status, totalTimeSpent, lastAccessedAt, createdAt, updatedAt)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 );
+const insertLearningPath = db.prepare(
+    `INSERT INTO userLearningPaths (userId, pathName, description, courseIds, currentCourseIndex, status, createdAt, updatedAt)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+);
+const insertLoginHistory = db.prepare(
+    `INSERT INTO userLoginHistory (userId, loginAt, ipAddress, userAgent, success) VALUES (?, ?, ?, ?, ?)`
+);
+const insertAdminLog = db.prepare(
+    `INSERT INTO adminActivityLog (adminId, action, targetUserId, targetCourseId, details, performedAt)
+   VALUES (?, ?, ?, ?, ?, ?)`
+);
 
-const progressData = [
-    [1, 1, now - 604800, 24, "in-progress", 120, now - 3600],
-    [1, 8, now - 1209600, 82, "in-progress", 600, now - 86400],
-    [1, 6, now - 2592000, 100, "completed", 4200, now - 604800],
-    [1, 2, now - 172800, 16, "enrolled", 95, now - 172800],
-    [2, 4, now - 604800, 88, "in-progress", 820, now - 7200],
-    [2, 2, now - 1209600, 21, "enrolled", 150, now - 259200],
+const courseIds = coursesData.map((_, idx) => idx + 1);
+const learningStyles = ["visual", "hands-on", "project-based", "reading", "video"];
+const difficulties = ["beginner", "intermediate", "advanced"];
+const skillPool = ["Python", "SQL", "React", "Node.js", "Docker", "AWS", "JavaScript", "TypeScript", "TensorFlow", "Pandas", "Kubernetes", "Linux"];
+const interestPool = ["Web Development", "Data Science", "Machine Learning", "DevOps", "Cloud Computing", "Mobile Development", "Artificial Intelligence", "Cybersecurity"];
+const goalPool = ["Full Stack Developer", "Data Scientist", "ML Engineer", "DevOps Engineer", "Cloud Architect", "Mobile Developer", "AI Researcher", "Security Analyst"];
+const userAgents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+    "Mozilla/5.0 (X11; Linux x86_64)",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X)",
 ];
 
-for (const [userId, courseId, enrollDate, pct, status, time, lastAccess] of progressData) {
-    insertProgress.run(userId, courseId, enrollDate, pct, status, time, lastAccess, now, now);
+const sampleUnique = (arr: number[], count: number): number[] => {
+    const copy = [...arr];
+    const out: number[] = [];
+    while (copy.length > 0 && out.length < count) {
+        const idx = Math.floor(Math.random() * copy.length);
+        out.push(copy[idx]);
+        copy.splice(idx, 1);
+    }
+    return out;
+};
+
+let totalInteractions = 0;
+let totalProgress = 0;
+let totalBookmarks = 0;
+let totalPaths = 0;
+let totalLogins = 0;
+
+for (const student of studentUsers) {
+    const skills = sampleUnique(skillPool.map((_, i) => i), randomInt(3, 5)).map(i => skillPool[i]);
+    const interests = sampleUnique(interestPool.map((_, i) => i), randomInt(1, 3)).map(i => interestPool[i]);
+    const goals = sampleUnique(goalPool.map((_, i) => i), randomInt(1, 2)).map(i => goalPool[i]);
+    const preferredDifficulty = pick(difficulties);
+    const learningStyle = pick(learningStyles);
+
+    insertProfile.run(
+        student.id,
+        JSON.stringify(skills),
+        JSON.stringify(interests),
+        JSON.stringify(goals),
+        preferredDifficulty,
+        learningStyle,
+        `${student.name} is focused on ${goals[0]}.`,
+        now - randomInt(1, 21 * 24 * 60 * 60),
+        now,
+        now
+    );
+
+    const interactionCount = randomInt(5, 10);
+    const pickedCourses = sampleUnique(courseIds, interactionCount);
+    for (const courseId of pickedCourses) {
+        const roll = Math.random();
+        const interactionType = roll < 0.55 ? "viewed" : roll < 0.8 ? "started" : roll < 0.93 ? "rated" : "bookmarked";
+        const rating = interactionType === "rated" ? randomInt(380, 500) : null;
+        const completion =
+            interactionType === "viewed"
+                ? randomInt(5, 40)
+                : interactionType === "started"
+                    ? randomInt(20, 65)
+                    : interactionType === "rated"
+                        ? randomInt(65, 100)
+                        : 0;
+        const timeSpent = interactionType === "bookmarked" ? 0 : completion * randomInt(6, 14);
+        insertInteraction.run(
+            student.id,
+            courseId,
+            interactionType,
+            rating,
+            timeSpent,
+            completion,
+            now - randomInt(0, 30 * 24 * 60 * 60)
+        );
+        totalInteractions += 1;
+    }
+
+    const progressCount = randomInt(2, 4);
+    const progressCourses = sampleUnique(courseIds, progressCount);
+    const statuses = ["enrolled", "in-progress", "completed"] as const;
+    for (const courseId of progressCourses) {
+        const status = pick([...statuses]);
+        const pct = status === "completed" ? 100 : status === "in-progress" ? randomInt(20, 85) : randomInt(0, 20);
+        const timeSpent = pct * randomInt(10, 18);
+        const enrollmentDate = now - randomInt(7, 90) * 24 * 60 * 60;
+        insertProgress.run(
+            student.id,
+            courseId,
+            enrollmentDate,
+            pct,
+            status,
+            timeSpent,
+            now - randomInt(1, 10) * 24 * 60 * 60,
+            now,
+            now
+        );
+        totalProgress += 1;
+    }
+
+    const bookmarkCount = randomInt(2, 4);
+    const bookmarkCourses = sampleUnique(courseIds, bookmarkCount);
+    for (const courseId of bookmarkCourses) {
+        insertBookmark.run(student.id, courseId, "Saved for later", now - randomInt(0, 14 * 24 * 60 * 60));
+        totalBookmarks += 1;
+    }
+
+    const pathCount = randomInt(1, 2);
+    for (let p = 0; p < pathCount; p++) {
+        const pathCourses = sampleUnique(courseIds, randomInt(3, 5));
+        const currentIndex = Math.min(pathCourses.length - 1, randomInt(0, pathCourses.length - 1));
+        const status = pick(["active", "paused", "completed"] as const);
+        insertLearningPath.run(
+            student.id,
+            `${pick(interests)} Path ${p + 1}`,
+            `Guided plan for ${pick(interests)} fundamentals and projects.`,
+            JSON.stringify(pathCourses),
+            currentIndex,
+            status,
+            now,
+            now
+        );
+        totalPaths += 1;
+    }
+
+    const loginCount = randomInt(2, 5);
+    for (let l = 0; l < loginCount; l++) {
+        const success = Math.random() > 0.15 ? 1 : 0;
+        insertLoginHistory.run(
+            student.id,
+            now - randomInt(0, 45 * 24 * 60 * 60),
+            randomIp(),
+            pick(userAgents),
+            success
+        );
+        totalLogins += 1;
+    }
 }
-console.log(`✅ Seeded ${progressData.length} progress records`);
+
+const adminActions = [
+    { action: "ban_user", details: "Banned for repeated policy violations" },
+    { action: "view_user", details: "Reviewed learning path progress" },
+    { action: "reset_password", details: "Reset password on support request" },
+    { action: "unban_user", details: "User appeal approved" },
+    { action: "view_user", details: "Checked suspicious activity" },
+];
+
+for (let i = 0; i < adminActions.length; i++) {
+    const targetUser = pick(studentUsers);
+    insertAdminLog.run(
+        adminId,
+        adminActions[i].action,
+        targetUser.id,
+        null,
+        adminActions[i].details,
+        now - randomInt(0, 10 * 24 * 60 * 60)
+    );
+}
+
+console.log(`✅ Seeded ${studentUsers.length} user profiles`);
+console.log(`✅ Seeded ${totalInteractions} interactions`);
+console.log(`✅ Seeded ${totalProgress} progress records`);
+console.log(`✅ Seeded ${totalBookmarks} bookmarks`);
+console.log(`✅ Seeded ${totalPaths} learning paths`);
+console.log(`✅ Seeded ${totalLogins} login history events`);
+console.log(`✅ Seeded ${adminActions.length} admin activity log entries`);
 
 db.close();
 console.log("\n🎉 Database seeded successfully!");

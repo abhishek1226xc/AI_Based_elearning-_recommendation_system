@@ -12,6 +12,14 @@ export const users = sqliteTable("users", {
   passwordHash: text("passwordHash"),
   loginMethod: text("loginMethod"),
   role: text("role", { enum: ["user", "admin"] }).default("user").notNull(),
+  onboardingCompletedAt: integer("onboardingCompletedAt", { mode: "timestamp" }),
+  isActive: integer("isActive").notNull().default(1),
+  isBanned: integer("isBanned").notNull().default(0),
+  lastLoginIp: text("lastLoginIp"),
+  resetPasswordToken: text("resetPasswordToken"),
+  resetPasswordExpiresAt: integer("resetPasswordExpiresAt", { mode: "timestamp" }),
+  adminNotes: text("adminNotes"),
+  sessionInvalidatedAt: integer("sessionInvalidatedAt", { mode: "timestamp" }),
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
   lastSignedIn: integer("lastSignedIn", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
@@ -200,3 +208,52 @@ export const chatMessages = sqliteTable("chatMessages", {
 
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertChatMessage = typeof chatMessages.$inferInsert;
+
+/**
+ * Ordered learning paths for each user
+ */
+export const userLearningPaths = sqliteTable("userLearningPaths", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  pathName: text("pathName").notNull(),
+  description: text("description"),
+  courseIds: text("courseIds").notNull(),
+  currentCourseIndex: integer("currentCourseIndex").default(0),
+  status: text("status", { enum: ["active", "paused", "completed"] }).default("active"),
+  createdAt: integer("createdAt", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
+});
+
+export type UserLearningPath = typeof userLearningPaths.$inferSelect;
+export type InsertUserLearningPath = typeof userLearningPaths.$inferInsert;
+
+/**
+ * Login history events for audit/troubleshooting
+ */
+export const userLoginHistory = sqliteTable("userLoginHistory", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  loginAt: integer("loginAt", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
+  ipAddress: text("ipAddress"),
+  userAgent: text("userAgent"),
+  success: integer("success").notNull().default(1),
+});
+
+export type UserLoginHistory = typeof userLoginHistory.$inferSelect;
+export type InsertUserLoginHistory = typeof userLoginHistory.$inferInsert;
+
+/**
+ * Audit log for admin actions
+ */
+export const adminActivityLog = sqliteTable("adminActivityLog", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  adminId: integer("adminId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  action: text("action").notNull(),
+  targetUserId: integer("targetUserId").references(() => users.id),
+  targetCourseId: integer("targetCourseId").references(() => courses.id),
+  details: text("details"),
+  performedAt: integer("performedAt", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`),
+});
+
+export type AdminActivityLog = typeof adminActivityLog.$inferSelect;
+export type InsertAdminActivityLog = typeof adminActivityLog.$inferInsert;

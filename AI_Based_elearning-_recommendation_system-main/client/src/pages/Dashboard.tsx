@@ -127,6 +127,7 @@ export default function Dashboard() {
           </motion.div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => navigate("/courses")} className="font-medium text-slate-100 hover:text-white">Courses</Button>
+            <Button variant="ghost" onClick={() => navigate("/profile")} className="font-medium text-slate-100 hover:text-white">Profile</Button>
             <Button variant="ghost" onClick={() => navigate("/recommendations")} className="font-medium text-slate-100 hover:text-white">Recommendations</Button>
             <Button variant="outline" onClick={async () => { await logout(); navigate("/auth"); }} className="rounded-xl text-red-300 border-red-600/50 hover:bg-red-900/50">
               <LogOut className="w-4 h-4 mr-1" /> Sign Out

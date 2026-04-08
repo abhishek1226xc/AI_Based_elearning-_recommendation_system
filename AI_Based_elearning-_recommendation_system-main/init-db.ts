@@ -34,6 +34,14 @@ const schema = `
     passwordHash TEXT,
     loginMethod TEXT,
     role TEXT NOT NULL DEFAULT 'user',
+    onboardingCompletedAt INTEGER,
+    isActive INTEGER NOT NULL DEFAULT 1,
+    isBanned INTEGER NOT NULL DEFAULT 0,
+    lastLoginIp TEXT,
+    resetPasswordToken TEXT,
+    resetPasswordExpiresAt INTEGER,
+    adminNotes TEXT,
+    sessionInvalidatedAt INTEGER,
     createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
     updatedAt INTEGER NOT NULL DEFAULT (unixepoch()),
     lastSignedIn INTEGER NOT NULL DEFAULT (unixepoch())
@@ -168,6 +176,46 @@ const schema = `
     createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
     FOREIGN KEY (sessionId) REFERENCES chatSessions(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS userLearningPaths (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    pathName TEXT NOT NULL,
+    description TEXT,
+    courseIds TEXT NOT NULL,
+    currentCourseIndex INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'active',
+    createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
+    updatedAt INTEGER NOT NULL DEFAULT (unixepoch()),
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS userLoginHistory (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    loginAt INTEGER NOT NULL DEFAULT (unixepoch()),
+    ipAddress TEXT,
+    userAgent TEXT,
+    success INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS adminActivityLog (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    adminId INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    targetUserId INTEGER,
+    targetCourseId INTEGER,
+    details TEXT,
+    performedAt INTEGER NOT NULL DEFAULT (unixepoch()),
+    FOREIGN KEY (adminId) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (targetUserId) REFERENCES users(id),
+    FOREIGN KEY (targetCourseId) REFERENCES courses(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_loginHistory_userId ON userLoginHistory(userId);
+  CREATE INDEX IF NOT EXISTS idx_learningPaths_userId ON userLearningPaths(userId);
+  CREATE INDEX IF NOT EXISTS idx_adminLog_adminId ON adminActivityLog(adminId);
 `;
 
 try {

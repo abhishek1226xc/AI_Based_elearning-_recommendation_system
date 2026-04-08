@@ -228,6 +228,26 @@ html {
 }
 .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
 
+.admin-card {
+  background: linear-gradient(160deg, rgba(12, 18, 32, 0.92), rgba(6, 11, 24, 0.92));
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  box-shadow: 0 20px 60px rgba(2, 6, 23, 0.35);
+}
+
+.admin-btn {
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.admin-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(16, 185, 129, 0.18);
+}
+
+.admin-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
 /* Glassmorphism */
 .glass {
   background: rgba(255, 255, 255, 0.7);

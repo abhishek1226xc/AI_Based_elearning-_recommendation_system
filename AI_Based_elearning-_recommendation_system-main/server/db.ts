@@ -15,6 +15,9 @@ import {
   bookmarks,
   chatSessions,
   chatMessages,
+  userLearningPaths,
+  userLoginHistory,
+  adminActivityLog,
   type Course,
   type UserProfile,
   type UserProgressRecord,
@@ -23,6 +26,9 @@ import {
   type ChatSession,
   type ChatMessage,
   type InsertChatMessage,
+  type UserLearningPath,
+  type UserLoginHistory,
+  type AdminActivityLog,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -46,6 +52,70 @@ const enforceRole = (identity: {
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
+const ensureUsersSchema = (sqlite: Database.Database) => {
+  try {
+    const columns = sqlite.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>;
+    if (columns.length === 0) return;
+    const existing = new Set(columns.map(col => col.name));
+
+    const addColumn = (name: string, type: string, defaultValue?: string) => {
+      if (existing.has(name)) return;
+      const defaultSql = defaultValue ? ` DEFAULT ${defaultValue}` : "";
+      sqlite.exec(`ALTER TABLE users ADD COLUMN ${name} ${type}${defaultSql}`);
+    };
+
+    addColumn("onboardingCompletedAt", "INTEGER");
+    addColumn("isActive", "INTEGER", "1");
+    addColumn("isBanned", "INTEGER", "0");
+    addColumn("lastLoginIp", "TEXT");
+    addColumn("resetPasswordToken", "TEXT");
+    addColumn("resetPasswordExpiresAt", "INTEGER");
+    addColumn("adminNotes", "TEXT");
+    addColumn("sessionInvalidatedAt", "INTEGER");
+  } catch (error) {
+    console.warn("[Database] Failed to ensure users schema:", error);
+  }
+};
+
+const ensureAdminTables = (sqlite: Database.Database) => {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS userLearningPaths (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      pathName TEXT NOT NULL,
+      description TEXT,
+      courseIds TEXT NOT NULL,
+      currentCourseIndex INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'active',
+      createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
+      updatedAt INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE TABLE IF NOT EXISTS userLoginHistory (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      loginAt INTEGER NOT NULL DEFAULT (unixepoch()),
+      ipAddress TEXT,
+      userAgent TEXT,
+      success INTEGER NOT NULL DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS adminActivityLog (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      adminId INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      action TEXT NOT NULL,
+      targetUserId INTEGER REFERENCES users(id),
+      targetCourseId INTEGER REFERENCES courses(id),
+      details TEXT,
+      performedAt INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_loginHistory_userId ON userLoginHistory(userId);
+    CREATE INDEX IF NOT EXISTS idx_learningPaths_userId ON userLearningPaths(userId);
+    CREATE INDEX IF NOT EXISTS idx_adminLog_adminId ON adminActivityLog(adminId);
+  `);
+};
+
 /**
  * Lazily create the drizzle SQLite instance.
  * The DB file is stored at ./data/elearning.db relative to project root.
@@ -61,6 +131,8 @@ export function getDb() {
       const sqlite = new Database(dbPath);
       sqlite.pragma('journal_mode = WAL');
       sqlite.pragma('foreign_keys = ON');
+      ensureUsersSchema(sqlite);
+      ensureAdminTables(sqlite);
       _db = drizzle(sqlite);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
@@ -416,8 +488,91 @@ export async function createUser(data: { email: string; name: string; passwordHa
     loginMethod: "email",
     role: enforceRole({ openId, email: data.email }),
     lastSignedIn: new Date(),
+    isActive: 1,
+    isBanned: 0,
   });
   return getUserByOpenId(openId);
+}
+
+export async function setResetPasswordToken(userId: number, token: string | null, expiresAt: Date | null) {
+  const db = getDb();
+  if (!db) return;
+  await db.update(users)
+    .set({ resetPasswordToken: token, resetPasswordExpiresAt: expiresAt })
+    .where(eq(users.id, userId));
+}
+
+export async function updateUserPassword(userId: number, passwordHash: string) {
+  const db = getDb();
+  if (!db) return;
+  await db.update(users)
+    .set({
+      passwordHash,
+      resetPasswordToken: null,
+      resetPasswordExpiresAt: null,
+      sessionInvalidatedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
+}
+
+export async function updateUserLoginMeta(userId: number, ip: string | null) {
+  const db = getDb();
+  if (!db) return;
+  await db.update(users)
+    .set({ lastLoginIp: ip, lastSignedIn: new Date(), updatedAt: new Date() })
+    .where(eq(users.id, userId));
+}
+
+export async function getUserLearningPaths(userId: number): Promise<UserLearningPath[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(userLearningPaths).where(eq(userLearningPaths.userId, userId));
+}
+
+export async function getUserLoginHistory(userId: number, limit = 20): Promise<UserLoginHistory[]> {
+  const db = getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(userLoginHistory)
+    .where(eq(userLoginHistory.userId, userId))
+    .orderBy(desc(userLoginHistory.loginAt))
+    .limit(limit);
+}
+
+export async function addUserLoginHistory(
+  userId: number,
+  ipAddress: string | null,
+  userAgent: string | null,
+  success: number
+): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  await db.insert(userLoginHistory).values({
+    userId,
+    ipAddress: ipAddress ?? null,
+    userAgent: userAgent ?? null,
+    success,
+  });
+}
+
+export async function addAdminActivity(
+  adminId: number,
+  action: string,
+  targetUserId?: number | null,
+  targetCourseId?: number | null,
+  details?: string | null
+): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  await db.insert(adminActivityLog).values({
+    adminId,
+    action,
+    targetUserId: targetUserId ?? null,
+    targetCourseId: targetCourseId ?? null,
+    details: details ?? null,
+  });
 }
 
 // ── Bookmark Functions ───────────────────────────────────────────────

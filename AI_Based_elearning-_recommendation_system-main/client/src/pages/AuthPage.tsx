@@ -15,10 +15,13 @@ export default function AuthPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPw, setShowPw] = useState(false);
+    const [showForgot, setShowForgot] = useState(false);
+    const [forgotEmail, setForgotEmail] = useState("");
 
     const utils = trpc.useUtils();
     const loginMutation = trpc.auth.login.useMutation();
     const registerMutation = trpc.auth.register.useMutation();
+    const forgotMutation = trpc.auth.forgotPassword.useMutation();
     const isLoading = loginMutation.isPending || registerMutation.isPending;
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -231,7 +234,53 @@ export default function AuthPage() {
                                         {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                     </button>
                                 </div>
+                                {mode === "login" && (
+                                    <div className="mt-3 text-right">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowForgot((prev) => !prev)}
+                                            className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                                        >
+                                            Forgot password?
+                                        </button>
+                                    </div>
+                                )}
                             </div>
+
+                            {mode === "login" && showForgot && (
+                                <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+                                    <p className="text-xs font-semibold text-blue-700">Reset your password</p>
+                                    <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+                                        <Input
+                                            type="email"
+                                            placeholder="you@example.com"
+                                            value={forgotEmail || email}
+                                            onChange={(e) => { setForgotEmail(e.target.value); }}
+                                            className="rounded-xl"
+                                        />
+                                        <Button
+                                            type="button"
+                                            onClick={async () => {
+                                                try {
+                                                    const targetEmail = (forgotEmail || email).trim();
+                                                    if (!targetEmail) {
+                                                        toast.error("Enter your email to reset your password");
+                                                        return;
+                                                    }
+                                                    await forgotMutation.mutateAsync({ email: targetEmail });
+                                                    toast.success("If this email exists, a reset link has been sent");
+                                                } catch (error: unknown) {
+                                                    const message = error instanceof Error ? error.message : "Reset failed";
+                                                    toast.error(message);
+                                                }
+                                            }}
+                                            className="rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+                                        >
+                                            {forgotMutation.isPending ? "Sending..." : "Send link"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
 
                             <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
                                 <Button

@@ -52,6 +52,14 @@ async function startServer() {
   registerChatRoutes(app);
 
   // REST fallback routes for recommendations
+  app.get("/health", (_req, res) => {
+    res.json({
+      status: "ok",
+      dbConnected: Boolean(db),
+      uptime: process.uptime(),
+    });
+  });
+
   app.get("/api/v1/recommendations/:userId", async (req, res) => {
     try {
       const userId = Number(req.params.userId);

@@ -196,13 +196,14 @@ class SDKServer {
       name: payload.name,
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+      .setIssuedAt()
       .setExpirationTime(expirationSeconds)
       .sign(secretKey);
   }
 
   async verifySession(
     cookieValue: string | undefined | null
-  ): Promise<{ openId: string; appId: string; name: string } | null> {
+  ): Promise<{ openId: string; appId: string; name: string; issuedAt: number } | null> {
     if (!cookieValue) {
       console.warn("[Auth] Missing session cookie");
       return null;
@@ -213,7 +214,7 @@ class SDKServer {
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
       });
-      const { openId, appId, name } = payload as Record<string, unknown>;
+      const { openId, appId, name, iat } = payload as Record<string, unknown>;
 
       if (
         !isNonEmptyString(openId) ||
@@ -228,6 +229,7 @@ class SDKServer {
         openId,
         appId,
         name,
+        issuedAt: typeof iat === "number" ? iat * 1000 : 0,
       };
     } catch (error) {
       console.warn("[Auth] Session verification failed", String(error));
@@ -270,6 +272,12 @@ class SDKServer {
       if (session) {
         const user = await db.getUserByOpenId(session.openId);
         if (user) {
+          const invalidatedAt = user.sessionInvalidatedAt
+            ? new Date(user.sessionInvalidatedAt).getTime()
+            : 0;
+          if (invalidatedAt && session.issuedAt < invalidatedAt) {
+            throw ForbiddenError("Session expired");
+          }
           await db.upsertUser({ openId: user.openId, lastSignedIn: new Date() });
           const refreshedUser = await db.getUserByOpenId(session.openId);
           if (refreshedUser) {
